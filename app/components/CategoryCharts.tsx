@@ -62,6 +62,7 @@ export function SubPieChart({
                   paddingAngle={2}
                   dataKey="value"
                   nameKey="name"
+                  isAnimationActive={false}
                 >
                   {filtered.map((entry, i) => (
                     <Cell key={i} fill={entry.color} />
@@ -151,6 +152,7 @@ export function CategoryTrendChart({
               stroke={color}
               strokeWidth={2}
               dot={{ fill: color, r: 4 }}
+              isAnimationActive={false}
             />
           </LineChart>
         </ResponsiveContainer>

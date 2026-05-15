@@ -7,9 +7,15 @@ import { useCrud } from "@/lib/use-crud";
 
 const EMPTY = { name: "", amount: "", rate: "", note: "" };
 
-export default function LiabilityCard({ liabilities, month, onDataChanged }: { liabilities: Liability[]; month?: string; onDataChanged?: () => void }) {
+type LiabilityChange = (
+  key: "liabilities",
+  action: "add" | "update" | "delete",
+  row: Partial<Liability> & { id: number }
+) => void;
+
+export default function LiabilityCard({ liabilities, month, onChange }: { liabilities: Liability[]; month?: string; onChange?: LiabilityChange }) {
   const total = liabilities.reduce((sum, l) => sum + l.amount, 0);
-  const { saving, addRow, updateRow, deleteRow } = useCrud("liabilities", month ?? "04", onDataChanged);
+  const { saving, addRow, updateRow, deleteRow } = useCrud("liabilities", month ?? "04");
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [showAdd, setShowAdd] = useState(false);
@@ -18,6 +24,29 @@ export default function LiabilityCard({ liabilities, month, onDataChanged }: { l
   function startEdit(l: Liability) {
     setEditId(l.id!);
     setForm({ name: l.name, amount: String(l.amount), rate: String(l.rate), note: l.note });
+  }
+
+  async function handleSave(id: number) {
+    const vals = { ...form, amount: Number(form.amount), rate: Number(form.rate) };
+    const row: Omit<Liability, "id"> = { name: form.name, amount: Number(form.amount) || 0, rate: Number(form.rate) || 0, note: form.note };
+    setEditId(null);
+    const ok = await updateRow(id, vals);
+    if (ok) onChange?.("liabilities", "update", { ...row, id });
+  }
+
+  async function handleAdd() {
+    const vals = { ...form, amount: Number(form.amount), rate: Number(form.rate) };
+    const row: Omit<Liability, "id"> = { name: form.name, amount: Number(form.amount) || 0, rate: Number(form.rate) || 0, note: form.note };
+    setShowAdd(false);
+    setForm(EMPTY);
+    const newId = await addRow(vals);
+    if (newId != null) onChange?.("liabilities", "add", { ...row, id: newId });
+  }
+
+  async function handleDelete(id: number) {
+    if (!confirm("삭제하시겠습니까?")) return;
+    const ok = await deleteRow(id);
+    if (ok) onChange?.("liabilities", "delete", { id });
   }
 
   return (
@@ -40,7 +69,7 @@ export default function LiabilityCard({ liabilities, month, onDataChanged }: { l
               <input className="w-full bg-muted/50 rounded px-2 py-1 text-sm" placeholder="이자율 (%)" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} />
               <input className="w-full bg-muted/50 rounded px-2 py-1 text-sm" placeholder="비고" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
               <div className="flex gap-1">
-                <button onClick={() => { updateRow(l.id!, { ...form, amount: Number(form.amount), rate: Number(form.rate) }); setEditId(null); }} disabled={saving} className="text-xs px-2 py-1 rounded bg-emerald-600 text-white">저장</button>
+                <button onClick={() => handleSave(l.id!)} disabled={saving} className="text-xs px-2 py-1 rounded bg-emerald-600 text-white">저장</button>
                 <button onClick={() => setEditId(null)} className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">취소</button>
               </div>
             </div>
@@ -55,7 +84,7 @@ export default function LiabilityCard({ liabilities, month, onDataChanged }: { l
                 {editable && (
                   <div className="flex gap-1">
                     <button onClick={() => startEdit(l)} className="text-xs text-muted-foreground hover:text-foreground">편집</button>
-                    <button onClick={() => { if (confirm("삭제하시겠습니까?")) deleteRow(l.id!); }} className="text-xs text-red-400 hover:text-red-300">삭제</button>
+                    <button onClick={() => handleDelete(l.id!)} className="text-xs text-red-400 hover:text-red-300">삭제</button>
                   </div>
                 )}
               </div>
@@ -69,7 +98,7 @@ export default function LiabilityCard({ liabilities, month, onDataChanged }: { l
             <input className="w-full bg-muted/50 rounded px-2 py-1 text-sm" placeholder="이자율 (%)" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} />
             <input className="w-full bg-muted/50 rounded px-2 py-1 text-sm" placeholder="비고" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
             <div className="flex gap-1">
-              <button onClick={() => { addRow({ ...form, amount: Number(form.amount), rate: Number(form.rate) }); setShowAdd(false); setForm(EMPTY); }} disabled={saving} className="text-xs px-2 py-1 rounded bg-emerald-600 text-white">추가</button>
+              <button onClick={handleAdd} disabled={saving} className="text-xs px-2 py-1 rounded bg-emerald-600 text-white">추가</button>
               <button onClick={() => setShowAdd(false)} className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">취소</button>
             </div>
           </div>

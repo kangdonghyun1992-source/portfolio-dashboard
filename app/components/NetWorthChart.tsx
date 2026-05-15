@@ -73,6 +73,7 @@ export default function NetWorthChart() {
               strokeWidth={2}
               dot={{ fill: "#34d399", r: 4 }}
               name="netWorth"
+              isAnimationActive={false}
             />
             <Line
               type="monotone"
@@ -82,6 +83,7 @@ export default function NetWorthChart() {
               dot={{ fill: "#60a5fa", r: 4 }}
               strokeDasharray="5 5"
               name="totalAssets"
+              isAnimationActive={false}
             />
           </LineChart>
         </ResponsiveContainer>

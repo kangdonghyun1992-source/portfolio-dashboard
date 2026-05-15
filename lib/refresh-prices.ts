@@ -5,7 +5,7 @@ type DbLike = {
   prepare: (sql: string) => {
     all: (...args: unknown[]) => Promise<unknown[]>;
     get: (...args: unknown[]) => Promise<unknown>;
-    run: (...args: unknown[]) => Promise<void>;
+    run: (...args: unknown[]) => Promise<{ lastInsertRowid?: number }>;
   };
 };
 

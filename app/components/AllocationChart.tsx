@@ -43,6 +43,7 @@ export default function AllocationChart({
                   paddingAngle={2}
                   dataKey="amount"
                   nameKey="category"
+                  isAnimationActive={false}
                 >
                   {sorted.map((entry, i) => (
                     <Cell key={i} fill={entry.color} />

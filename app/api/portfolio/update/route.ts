@@ -24,8 +24,8 @@ export async function POST(request: Request) {
       const cols = ["user_id", "month", ...Object.keys(values)];
       const placeholders = cols.map(() => "?").join(",");
       const vals = [userId, monthKey, ...Object.values(values)];
-      await db.prepare(`INSERT INTO ${table} (${cols.join(",")}) VALUES (${placeholders})`).run(...vals);
-      return NextResponse.json({ success: true, action: "added" });
+      const result = await db.prepare(`INSERT INTO ${table} (${cols.join(",")}) VALUES (${placeholders})`).run(...vals);
+      return NextResponse.json({ success: true, action: "added", id: result.lastInsertRowid });
     }
 
     if (action === "update" && id) {

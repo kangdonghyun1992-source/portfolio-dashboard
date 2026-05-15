@@ -6,9 +6,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { CashAsset } from "@/lib/types";
 import { useCrud } from "@/lib/use-crud";
 
-export default function CashTable({ cash, month, onDataChanged }: { cash: CashAsset[]; month: string; onDataChanged?: () => void }) {
+type CashChange = (
+  key: "cash",
+  action: "add" | "update" | "delete",
+  row: Partial<CashAsset> & { id: number }
+) => void;
+
+export default function CashTable({ cash, month, onChange }: { cash: CashAsset[]; month: string; onChange?: CashChange }) {
   const total = cash.reduce((sum, c) => sum + c.amount, 0);
-  const { saving, addRow, updateRow, deleteRow } = useCrud("cash", month, onDataChanged);
+  const { saving, addRow, updateRow, deleteRow } = useCrud("cash", month);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState({ account: "", amount: "", note: "" });
   const [showAdd, setShowAdd] = useState(false);
@@ -16,6 +22,27 @@ export default function CashTable({ cash, month, onDataChanged }: { cash: CashAs
   function startEdit(c: CashAsset) {
     setEditId(c.id!);
     setForm({ account: c.account, amount: String(c.amount), note: c.note });
+  }
+
+  async function handleSave(id: number) {
+    const row: Omit<CashAsset, "id"> = { account: form.account, amount: Number(form.amount) || 0, note: form.note };
+    setEditId(null);
+    const ok = await updateRow(id, form);
+    if (ok) onChange?.("cash", "update", { ...row, id });
+  }
+
+  async function handleAdd() {
+    const row: Omit<CashAsset, "id"> = { account: form.account, amount: Number(form.amount) || 0, note: form.note };
+    setShowAdd(false);
+    setForm({ account: "", amount: "", note: "" });
+    const newId = await addRow(form);
+    if (newId != null) onChange?.("cash", "add", { ...row, id: newId });
+  }
+
+  async function handleDelete(id: number) {
+    if (!confirm("삭제하시겠습니까?")) return;
+    const ok = await deleteRow(id);
+    if (ok) onChange?.("cash", "delete", { id });
   }
 
   return (
@@ -48,7 +75,7 @@ export default function CashTable({ cash, month, onDataChanged }: { cash: CashAs
                   <TableCell><input className="w-full bg-muted/50 rounded px-2 py-1 text-sm text-right" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <button onClick={() => { updateRow(c.id!, form); setEditId(null); }} disabled={saving} className="text-xs px-2 py-1 rounded bg-emerald-600 text-white">저장</button>
+                      <button onClick={() => handleSave(c.id!)} disabled={saving} className="text-xs px-2 py-1 rounded bg-emerald-600 text-white">저장</button>
                       <button onClick={() => setEditId(null)} className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">취소</button>
                     </div>
                   </TableCell>
@@ -61,7 +88,7 @@ export default function CashTable({ cash, month, onDataChanged }: { cash: CashAs
                   <TableCell>
                     <div className="flex gap-1">
                       <button onClick={() => startEdit(c)} className="text-xs text-muted-foreground hover:text-foreground">편집</button>
-                      <button onClick={() => { if (confirm("삭제하시겠습니까?")) deleteRow(c.id!); }} className="text-xs text-red-400 hover:text-red-300">삭제</button>
+                      <button onClick={() => handleDelete(c.id!)} className="text-xs text-red-400 hover:text-red-300">삭제</button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -74,7 +101,7 @@ export default function CashTable({ cash, month, onDataChanged }: { cash: CashAs
                 <TableCell><input className="w-full bg-muted/50 rounded px-2 py-1 text-sm text-right" placeholder="금액" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></TableCell>
                 <TableCell>
                   <div className="flex gap-1">
-                    <button onClick={() => { addRow(form); setShowAdd(false); }} disabled={saving} className="text-xs px-2 py-1 rounded bg-emerald-600 text-white">추가</button>
+                    <button onClick={handleAdd} disabled={saving} className="text-xs px-2 py-1 rounded bg-emerald-600 text-white">추가</button>
                     <button onClick={() => setShowAdd(false)} className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">취소</button>
                   </div>
                 </TableCell>

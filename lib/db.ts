@@ -84,7 +84,9 @@ export default function getDb() {
         },
         async run(...args: unknown[]) {
           await ensureInit;
-          await client.execute({ sql, args: args as (string | number | null)[] });
+          const result = await client.execute({ sql, args: args as (string | number | null)[] });
+          const id = result.lastInsertRowid;
+          return { lastInsertRowid: id != null ? Number(id) : undefined };
         },
       };
     },

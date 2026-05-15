@@ -18,9 +18,15 @@ function formatKRW(v: number): string {
   return v.toLocaleString("ko-KR");
 }
 
-export default function StockTable({ stocks, month, onDataChanged }: { stocks: StockPosition[]; month?: string; onDataChanged?: () => void }) {
+type StockChange = (
+  key: "stocks",
+  action: "add" | "update" | "delete",
+  row: Partial<StockPosition> & { id: number }
+) => void;
+
+export default function StockTable({ stocks, month, onChange }: { stocks: StockPosition[]; month?: string; onChange?: StockChange }) {
   const total = stocks.reduce((sum, s) => sum + s.valueKRW, 0);
-  const { saving, addRow, updateRow, deleteRow } = useCrud("stocks", month ?? "04", onDataChanged);
+  const { saving, addRow, updateRow, deleteRow } = useCrud("stocks", month ?? "04");
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [showAdd, setShowAdd] = useState(false);
@@ -54,15 +60,46 @@ export default function StockTable({ stocks, month, onDataChanged }: { stocks: S
     setForm({ platform: s.platform, name: s.name, ticker: s.ticker, quantity: String(s.quantity), avg_price: s.avgPrice ? String(s.avgPrice) : "", current_price: String(s.currentPrice), value_usd: s.valueUSD != null ? String(s.valueUSD) : "", value_krw: String(s.valueKRW), category: s.category, currency: s.currency });
   }
 
-  function saveForm(id?: number) {
-    const vals = { ...form, quantity: Number(form.quantity), avg_price: form.avg_price ? Number(form.avg_price) : 0, current_price: Number(form.current_price), value_usd: form.value_usd ? Number(form.value_usd) : null, value_krw: Number(form.value_krw), domestic: form.currency === "KRW" ? 1 : 0 };
-    if (id) { updateRow(id, vals as Record<string, string | number>); setEditId(null); }
-    else { addRow(vals as Record<string, string | number>); setShowAdd(false); }
-    setForm(EMPTY);
+  function formToPosition(): Omit<StockPosition, "id"> {
+    return {
+      platform: form.platform,
+      name: form.name,
+      ticker: form.ticker,
+      quantity: Number(form.quantity),
+      avgPrice: form.avg_price ? Number(form.avg_price) : 0,
+      currentPrice: Number(form.current_price),
+      currency: form.currency === "KRW" ? "KRW" : "USD",
+      valueUSD: form.value_usd ? Number(form.value_usd) : null,
+      valueKRW: Number(form.value_krw),
+      category: form.category,
+    };
   }
 
-  function handleCategoryChange(stockId: number, newCategory: string) {
-    updateRow(stockId, { category: newCategory });
+  async function saveForm(id?: number) {
+    const vals = { ...form, quantity: Number(form.quantity), avg_price: form.avg_price ? Number(form.avg_price) : 0, current_price: Number(form.current_price), value_usd: form.value_usd ? Number(form.value_usd) : null, value_krw: Number(form.value_krw), domestic: form.currency === "KRW" ? 1 : 0 };
+    const row = formToPosition();
+    if (id) {
+      setEditId(null);
+      setForm(EMPTY);
+      const ok = await updateRow(id, vals as Record<string, string | number>);
+      if (ok) onChange?.("stocks", "update", { ...row, id });
+    } else {
+      setShowAdd(false);
+      setForm(EMPTY);
+      const newId = await addRow(vals as Record<string, string | number>);
+      if (newId != null) onChange?.("stocks", "add", { ...row, id: newId });
+    }
+  }
+
+  async function handleCategoryChange(stockId: number, newCategory: string) {
+    onChange?.("stocks", "update", { id: stockId, category: newCategory });
+    await updateRow(stockId, { category: newCategory });
+  }
+
+  async function handleDelete(stockId: number) {
+    if (!confirm("삭제하시겠습니까?")) return;
+    const ok = await deleteRow(stockId);
+    if (ok) onChange?.("stocks", "delete", { id: stockId });
   }
 
   const sorted = [...stocks].sort((a, b) => b.valueKRW - a.valueKRW);
@@ -191,7 +228,7 @@ export default function StockTable({ stocks, month, onDataChanged }: { stocks: S
                       {editable && (
                         <div className="flex gap-1">
                           <button onClick={() => startEdit(s)} className="text-xs text-muted-foreground hover:text-foreground">편집</button>
-                          <button onClick={() => { if (confirm("삭제하시겠습니까?")) deleteRow(s.id!); }} className="text-xs text-red-400 hover:text-red-300">삭제</button>
+                          <button onClick={() => handleDelete(s.id!)} className="text-xs text-red-400 hover:text-red-300">삭제</button>
                         </div>
                       )}
                     </TableCell>

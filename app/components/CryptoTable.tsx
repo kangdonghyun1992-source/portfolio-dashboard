@@ -18,9 +18,15 @@ function formatKRW(v: number): string {
   return v.toLocaleString("ko-KR");
 }
 
-export default function CryptoTable({ crypto, month, onDataChanged }: { crypto: CryptoPosition[]; month?: string; onDataChanged?: () => void }) {
+type CryptoChange = (
+  key: "crypto",
+  action: "add" | "update" | "delete",
+  row: Partial<CryptoPosition> & { id: number }
+) => void;
+
+export default function CryptoTable({ crypto, month, onChange }: { crypto: CryptoPosition[]; month?: string; onChange?: CryptoChange }) {
   const total = crypto.reduce((sum, c) => sum + c.valueKRW, 0);
-  const { saving, addRow, updateRow, deleteRow } = useCrud("crypto", month ?? "04", onDataChanged);
+  const { saving, addRow, updateRow, deleteRow } = useCrud("crypto", month ?? "04");
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [showAdd, setShowAdd] = useState(false);
@@ -51,15 +57,45 @@ export default function CryptoTable({ crypto, month, onDataChanged }: { crypto: 
     setForm({ name: c.name, ticker: c.ticker, exchange: c.exchange, quantity: String(c.quantity), avg_price: c.avgPrice ? String(c.avgPrice) : "", current_price: String(c.currentPrice), value_krw: String(c.valueKRW), category: c.category || "기타" });
   }
 
-  function saveForm(id?: number) {
-    const vals = { ...form, quantity: Number(form.quantity), avg_price: form.avg_price ? Number(form.avg_price) : 0, current_price: Number(form.current_price), value_krw: Number(form.value_krw) };
-    if (id) { updateRow(id, vals); setEditId(null); }
-    else { addRow(vals); setShowAdd(false); }
-    setForm(EMPTY);
+  function formToPosition(): Omit<CryptoPosition, "id"> {
+    return {
+      name: form.name,
+      ticker: form.ticker,
+      exchange: form.exchange,
+      quantity: Number(form.quantity),
+      avgPrice: form.avg_price ? Number(form.avg_price) : 0,
+      currentPrice: Number(form.current_price),
+      valueKRW: Number(form.value_krw),
+      pnlPercent: 0,
+      category: form.category,
+    };
   }
 
-  function handleCategoryChange(cryptoId: number, newCategory: string) {
-    updateRow(cryptoId, { category: newCategory });
+  async function saveForm(id?: number) {
+    const vals = { ...form, quantity: Number(form.quantity), avg_price: form.avg_price ? Number(form.avg_price) : 0, current_price: Number(form.current_price), value_krw: Number(form.value_krw) };
+    const row = formToPosition();
+    if (id) {
+      setEditId(null);
+      setForm(EMPTY);
+      const ok = await updateRow(id, vals);
+      if (ok) onChange?.("crypto", "update", { ...row, id });
+    } else {
+      setShowAdd(false);
+      setForm(EMPTY);
+      const newId = await addRow(vals);
+      if (newId != null) onChange?.("crypto", "add", { ...row, id: newId });
+    }
+  }
+
+  async function handleCategoryChange(cryptoId: number, newCategory: string) {
+    onChange?.("crypto", "update", { id: cryptoId, category: newCategory });
+    await updateRow(cryptoId, { category: newCategory });
+  }
+
+  async function handleDelete(cryptoId: number) {
+    if (!confirm("삭제하시겠습니까?")) return;
+    const ok = await deleteRow(cryptoId);
+    if (ok) onChange?.("crypto", "delete", { id: cryptoId });
   }
 
   const sorted = [...crypto].sort((a, b) => b.valueKRW - a.valueKRW);
@@ -193,7 +229,7 @@ export default function CryptoTable({ crypto, month, onDataChanged }: { crypto: 
                       {editable && (
                         <div className="flex gap-1">
                           <button onClick={() => startEdit(c)} className="text-xs text-muted-foreground hover:text-foreground">편집</button>
-                          <button onClick={() => { if (confirm("삭제하시겠습니까?")) deleteRow(c.id!); }} className="text-xs text-red-400 hover:text-red-300">삭제</button>
+                          <button onClick={() => handleDelete(c.id!)} className="text-xs text-red-400 hover:text-red-300">삭제</button>
                         </div>
                       )}
                     </TableCell>

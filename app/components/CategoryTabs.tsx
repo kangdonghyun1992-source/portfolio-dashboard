@@ -5,9 +5,9 @@ const TABS = [
   { id: "cash", label: "현금" },
   { id: "stocks", label: "주식" },
   { id: "crypto", label: "크립토" },
-  { id: "pension", label: "연금" },
   { id: "property", label: "부동산" },
   { id: "debt", label: "부채" },
+  { id: "pension", label: "연금" },
 ] as const;
 
 export type TabId = (typeof TABS)[number]["id"];

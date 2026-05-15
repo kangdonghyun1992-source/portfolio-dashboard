@@ -3,7 +3,15 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import type { PortfolioData } from "@/lib/types";
+import type {
+  PortfolioData,
+  CashAsset,
+  StockPosition,
+  CryptoPosition,
+  Liability,
+  PensionAccount,
+  RealEstate,
+} from "@/lib/types";
 import SummaryCards from "./components/SummaryCards";
 import AllocationChart from "./components/AllocationChart";
 import StockTable from "./components/StockTable";
@@ -64,7 +72,6 @@ export default function Home() {
   const [month, setMonth] = useState("04");
   const [tab, setTab] = useState<TabId>("overview");
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saaTargets, setSaaTargets] = useState<SAATarget[]>([]);
   const hasLoadedRef = useRef(false);
@@ -88,9 +95,8 @@ export default function Home() {
 
   const fetchData = useCallback(async () => {
     if (status !== "authenticated") return;
-    // 첫 로드만 전체 스피너; 이후엔 기존 데이터 유지하며 백그라운드 갱신
+    // 첫 로드만 전체 스피너; 월 변경 시엔 기존 데이터 유지하며 조용히 갱신
     if (!hasLoadedRef.current) setLoading(true);
-    else setRefreshing(true);
     setError(null);
     try {
       const [res] = await Promise.all([
@@ -108,9 +114,54 @@ export default function Home() {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, [month, status, fetchSAA]);
+
+  // 행 1개 추가/수정/삭제 후 전체 재조회 대신 로컬 state만 갱신.
+  // 합계(summary/allocation)는 행 합으로 재계산.
+  const applyChange = useCallback(
+    <K extends "cash" | "stocks" | "crypto" | "liabilities" | "pension" | "realEstate">(
+      key: K,
+      action: "add" | "update" | "delete",
+      row: { id: number } & Partial<
+        CashAsset & StockPosition & CryptoPosition & Liability & PensionAccount & RealEstate
+      >
+    ) => {
+      setData((prev) => {
+        if (!prev) return prev;
+        const arr = prev[key] as Array<{ id?: number }>;
+        let nextArr: Array<{ id?: number }>;
+        if (action === "add") nextArr = [...arr, row];
+        else if (action === "update")
+          nextArr = arr.map((r) => (r.id === row.id ? { ...r, ...row } : r));
+        else nextArr = arr.filter((r) => r.id !== row.id);
+
+        const next: PortfolioData = { ...prev, [key]: nextArr } as PortfolioData;
+        const cashTotal = next.cash.reduce((s, c) => s + c.amount, 0);
+        const stockTotal = next.stocks.reduce((s, p) => s + p.valueKRW, 0);
+        const cryptoTotal = next.crypto.reduce((s, c) => s + c.valueKRW, 0);
+        const realEstateTotal = next.realEstate.reduce((s, r) => s + r.amount, 0);
+        const liabilityTotal = next.liabilities.reduce((s, l) => s + l.amount, 0);
+        const totalAssets = cashTotal + stockTotal + cryptoTotal + realEstateTotal;
+        const netWorth = totalAssets - liabilityTotal;
+
+        next.summary = {
+          ...next.summary,
+          totalAssets,
+          totalLiabilities: liabilityTotal,
+          netWorth,
+        };
+        next.allocation = [
+          { category: "현금", amount: cashTotal, percent: totalAssets > 0 ? Math.round((cashTotal / totalAssets) * 1000) / 10 : 0, color: "#22c55e" },
+          { category: "주식", amount: stockTotal, percent: totalAssets > 0 ? Math.round((stockTotal / totalAssets) * 1000) / 10 : 0, color: "#3b82f6" },
+          { category: "암호화폐", amount: cryptoTotal, percent: totalAssets > 0 ? Math.round((cryptoTotal / totalAssets) * 1000) / 10 : 0, color: "#f59e0b" },
+          { category: "부동산", amount: realEstateTotal, percent: totalAssets > 0 ? Math.round((realEstateTotal / totalAssets) * 1000) / 10 : 0, color: "#8b5cf6" },
+        ];
+        return next;
+      });
+    },
+    []
+  );
 
   useEffect(() => {
     fetchData();
@@ -262,15 +313,7 @@ export default function Home() {
   return (
     <main className="max-w-7xl mx-auto px-4 py-8 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          Portfolio Dashboard
-          {refreshing && (
-            <span
-              className="inline-block w-4 h-4 rounded-full border-2 border-muted-foreground border-t-transparent animate-spin"
-              aria-label="갱신 중"
-            />
-          )}
-        </h1>
+        <h1 className="text-3xl font-bold">Portfolio Dashboard</h1>
         <div className="flex items-center gap-4">
           <MonthSelector value={month} onChange={setMonth} />
           <ThemeToggle />
@@ -325,11 +368,11 @@ export default function Home() {
             현금, 주식, 크립토, 연금, 부동산, 부채를 모두 관리할 수 있습니다.
           </p>
           <CategoryTabs active={tab} onChange={setTab} />
-          {tab === "cash" && <CashTable cash={data.cash} month={month} onDataChanged={fetchData} />}
-          {tab === "stocks" && <StockTable stocks={data.stocks} month={month} onDataChanged={fetchData} />}
-          {tab === "crypto" && <CryptoTable crypto={data.crypto} month={month} onDataChanged={fetchData} />}
-          {tab === "pension" && <PensionCard pension={data.pension} month={month} onDataChanged={fetchData} />}
-          {tab === "debt" && <LiabilityCard liabilities={data.liabilities} month={month} onDataChanged={fetchData} />}
+          {tab === "cash" && <CashTable cash={data.cash} month={month} onChange={applyChange} />}
+          {tab === "stocks" && <StockTable stocks={data.stocks} month={month} onChange={applyChange} />}
+          {tab === "crypto" && <CryptoTable crypto={data.crypto} month={month} onChange={applyChange} />}
+          {tab === "pension" && <PensionCard pension={data.pension} month={month} onChange={applyChange} />}
+          {tab === "debt" && <LiabilityCard liabilities={data.liabilities} month={month} onChange={applyChange} />}
         </div>
       )}
 
@@ -382,7 +425,7 @@ export default function Home() {
                 <SubPieChart data={cashPieData()} title="현금" />
                 <CategoryTrendChart dataKey="cash" title="현금" color="#22c55e" />
               </div>
-              <CashTable cash={data.cash} month={month} onDataChanged={fetchData} />
+              <CashTable cash={data.cash} month={month} onChange={applyChange} />
             </div>
           )}
 
@@ -398,7 +441,7 @@ export default function Home() {
                 <SubPieChart data={stockPieData()} title="주식" />
                 <CategoryTrendChart dataKey="stocks" title="주식" color="#3b82f6" />
               </div>
-              <StockTable stocks={data.stocks} month={month} onDataChanged={fetchData} />
+              <StockTable stocks={data.stocks} month={month} onChange={applyChange} />
             </div>
           )}
 
@@ -414,7 +457,7 @@ export default function Home() {
                 <SubPieChart data={cryptoPieData()} title="크립토" />
                 <CategoryTrendChart dataKey="crypto" title="크립토" color="#f59e0b" />
               </div>
-              <CryptoTable crypto={data.crypto} month={month} onDataChanged={fetchData} />
+              <CryptoTable crypto={data.crypto} month={month} onChange={applyChange} />
             </div>
           )}
 
@@ -433,7 +476,7 @@ export default function Home() {
               <PensionCard
                 pension={data.pension}
                 month={month}
-                onDataChanged={fetchData}
+                onChange={applyChange}
                 colors={PENSION_COLORS}
               />
             </div>
@@ -474,7 +517,7 @@ export default function Home() {
                 prev={data.summary.prevLiabilityTotal}
                 inverseColor
               />
-              <LiabilityCard liabilities={data.liabilities} month={month} onDataChanged={fetchData} />
+              <LiabilityCard liabilities={data.liabilities} month={month} onChange={applyChange} />
             </div>
           )}
         </>
