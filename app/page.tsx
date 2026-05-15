@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import type { PortfolioData } from "@/lib/types";
 import SummaryCards from "./components/SummaryCards";
 import AllocationChart from "./components/AllocationChart";
@@ -14,7 +16,35 @@ import CategoryTabs, { type TabId } from "./components/CategoryTabs";
 import SAAChart from "./components/SAAChart";
 import NetWorthChart from "./components/NetWorthChart";
 import { SubPieChart, CategoryTrendChart } from "./components/CategoryCharts";
-import { calculateSAA } from "@/lib/saa";
+import SAASettings from "./components/SAASettings";
+import ThemeToggle from "./components/ThemeToggle";
+import MoMChange from "./components/MoMChange";
+import { calculateSAA, type SAATarget } from "@/lib/saa";
+
+function CategoryHeader({
+  title,
+  current,
+  prev,
+  inverseColor = false,
+}: {
+  title: string;
+  current: number;
+  prev: number | undefined;
+  inverseColor?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border bg-card p-4 shadow-sm flex items-center justify-between">
+      <div>
+        <p className="text-xs text-muted-foreground">{title}</p>
+        <p className="text-xl font-bold mt-0.5">{current.toLocaleString("ko-KR")}원</p>
+      </div>
+      <div className="flex flex-col items-end gap-0.5">
+        <span className="text-xs text-muted-foreground">전월 대비</span>
+        <MoMChange current={current} prev={prev} inverseColor={inverseColor} />
+      </div>
+    </div>
+  );
+}
 
 const STOCK_CATEGORY_COLORS: Record<string, string> = {
   "Bucket A": "#3b82f6",
@@ -28,33 +58,71 @@ const STOCK_CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function Home() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [data, setData] = useState<PortfolioData | null>(null);
   const [month, setMonth] = useState("04");
   const [tab, setTab] = useState<TabId>("overview");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saaTargets, setSaaTargets] = useState<SAATarget[]>([]);
+  const hasLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    }
+  }, [status, router]);
+
+  const fetchSAA = useCallback(async () => {
+    if (status !== "authenticated") return;
+    try {
+      const res = await fetch("/api/saa");
+      if (res.ok) {
+        const json = await res.json();
+        setSaaTargets(json);
+      }
+    } catch { /* ignore */ }
+  }, [status]);
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    if (status !== "authenticated") return;
+    // 첫 로드만 전체 스피너; 이후엔 기존 데이터 유지하며 백그라운드 갱신
+    if (!hasLoadedRef.current) setLoading(true);
+    else setRefreshing(true);
     setError(null);
     try {
-      const res = await fetch(`/api/portfolio?month=${month}`);
+      const [res] = await Promise.all([
+        fetch(`/api/portfolio?month=${month}`),
+        fetchSAA(),
+      ]);
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || "Failed to fetch");
       }
       const json = await res.json();
       setData(json);
+      hasLoadedRef.current = true;
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [month]);
+  }, [month, status, fetchSAA]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  if (status === "loading" || status === "unauthenticated") {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
+      </main>
+    );
+  }
 
   // Helpers for sub-pie data
   function stockPieData() {
@@ -79,20 +147,28 @@ export default function Home() {
     return result;
   }
 
+  const CRYPTO_CATEGORY_COLORS: Record<string, string> = {
+    "Layer 1": "#f97316",
+    "Layer 2": "#0ea5e9",
+    DeFi: "#8b5cf6",
+    스테이블코인: "#22c55e",
+    밈: "#f43f5e",
+  };
+
   function cryptoPieData() {
     if (!data) return [];
     const groups = new Map<string, number>();
     for (const c of data.crypto) {
-      groups.set(c.name, (groups.get(c.name) ?? 0) + c.valueKRW);
+      const cat = c.category || "기타";
+      groups.set(cat, (groups.get(cat) ?? 0) + c.valueKRW);
     }
-    const colors = ["#f97316", "#818cf8", "#06b6d4", "#22c55e", "#eab308", "#ec4899"];
     const sorted = Array.from(groups.entries()).sort((a, b) => b[1] - a[1]);
     const total = sorted.reduce((s, [, v]) => s + v, 0);
     const result: { name: string; value: number; color: string }[] = [];
     let otherTotal = 0;
-    sorted.forEach(([name, value], i) => {
-      if (i < 5 && value / total > 0.03) {
-        result.push({ name, value, color: colors[i] });
+    sorted.forEach(([name, value]) => {
+      if (value / total > 0.03) {
+        result.push({ name, value, color: CRYPTO_CATEGORY_COLORS[name] ?? "#737373" });
       } else {
         otherTotal += value;
       }
@@ -121,17 +197,58 @@ export default function Home() {
     return result;
   }
 
-  function pensionPieData() {
+  // 연금 항목별 색상 팔레트 (PensionCard와 공유)
+  const PENSION_COLORS = [
+    "#ec4899",
+    "#8b5cf6",
+    "#06b6d4",
+    "#22c55e",
+    "#f59e0b",
+    "#ef4444",
+    "#3b82f6",
+    "#a855f7",
+  ];
+
+  function pensionWithColors() {
     if (!data) return [];
-    const colors = ["#ec4899", "#f472b6"];
-    return data.pension.map((p, i) => ({
+    return [...data.pension]
+      .sort((a, b) => b.amount - a.amount)
+      .map((p, i) => ({ ...p, color: PENSION_COLORS[i % PENSION_COLORS.length] }));
+  }
+
+  function pensionPieData() {
+    return pensionWithColors().map((p) => ({
       name: p.institution,
       value: p.amount,
-      color: colors[i % colors.length],
+      color: p.color,
     }));
   }
 
   const pensionTotal = data?.pension.reduce((s, p) => s + p.amount, 0) ?? 0;
+
+  // 순자산 기준 배분: 부채는 부동산에서 차감하여 표시 (대부분 주택담보대출 가정)
+  function netWorthAllocation() {
+    if (!data) return [];
+    const liabilityTotal = data.summary.totalLiabilities;
+    const netWorth = data.summary.netWorth;
+    if (netWorth <= 0) return [];
+
+    const adjusted = data.allocation.map((a) => ({ ...a }));
+    const realEstateIdx = adjusted.findIndex((a) => a.category === "부동산");
+    let remainingLiability = liabilityTotal;
+    if (realEstateIdx >= 0 && remainingLiability > 0) {
+      const deduct = Math.min(adjusted[realEstateIdx].amount, remainingLiability);
+      adjusted[realEstateIdx].amount -= deduct;
+      remainingLiability -= deduct;
+    }
+
+    return adjusted
+      .filter((a) => a.amount > 0)
+      .map((a) => ({
+        ...a,
+        percent: Math.round((a.amount / netWorth) * 1000) / 10,
+      }));
+  }
 
   const isEmpty =
     data &&
@@ -145,8 +262,30 @@ export default function Home() {
   return (
     <main className="max-w-7xl mx-auto px-4 py-8 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Portfolio Dashboard</h1>
-        <MonthSelector value={month} onChange={setMonth} />
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          Portfolio Dashboard
+          {refreshing && (
+            <span
+              className="inline-block w-4 h-4 rounded-full border-2 border-muted-foreground border-t-transparent animate-spin"
+              aria-label="갱신 중"
+            />
+          )}
+        </h1>
+        <div className="flex items-center gap-4">
+          <MonthSelector value={month} onChange={setMonth} />
+          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            {session?.user?.image && (
+              <img src={session.user.image} alt="" className="w-8 h-8 rounded-full" />
+            )}
+            <button
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              로그아웃
+            </button>
+          </div>
+        </div>
       </div>
 
       {loading && (
@@ -196,7 +335,11 @@ export default function Home() {
 
       {data && !loading && !isEmpty && (
         <>
-          <SummaryCards summary={data.summary} pensionTotal={pensionTotal} />
+          <SummaryCards
+            summary={data.summary}
+            pensionTotal={pensionTotal}
+            prevPensionTotal={data.summary.prevPensionTotal}
+          />
           <CategoryTabs active={tab} onChange={setTab} />
 
           {/* 전체 탭: 순자산 추이 + 파이차트 + 리밸런싱 현황 */}
@@ -204,21 +347,37 @@ export default function Home() {
             <div className="space-y-6">
               <NetWorthChart />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <AllocationChart allocation={data.allocation} />
+                <AllocationChart allocation={data.allocation} title="자산 배분 (총자산)" />
+                <AllocationChart allocation={netWorthAllocation()} title="자산 배분 (순자산)" />
+              </div>
+              {saaTargets.length > 0 ? (
                 <SAAChart
                   results={calculateSAA(
                     data.stocks,
                     data.crypto,
-                    data.cash.reduce((s, c) => s + c.amount, 0)
+                    data.cash.reduce((s, c) => s + c.amount, 0),
+                    saaTargets
                   )}
                 />
-              </div>
+              ) : (
+                <div className="rounded-xl border bg-card p-6 shadow-sm flex items-center justify-center">
+                  <p className="text-muted-foreground text-sm">
+                    아래에서 목표 비중을 설정하면 리밸런싱 현황이 표시됩니다.
+                  </p>
+                </div>
+              )}
+              <SAASettings targets={saaTargets} onSave={fetchSAA} />
             </div>
           )}
 
           {/* 현금 탭 */}
           {tab === "cash" && (
             <div className="space-y-6">
+              <CategoryHeader
+                title="현금 총액"
+                current={data.cash.reduce((s, c) => s + c.amount, 0)}
+                prev={data.summary.prevCashTotal}
+              />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <SubPieChart data={cashPieData()} title="현금" />
                 <CategoryTrendChart dataKey="cash" title="현금" color="#22c55e" />
@@ -230,6 +389,11 @@ export default function Home() {
           {/* 주식 탭 */}
           {tab === "stocks" && (
             <div className="space-y-6">
+              <CategoryHeader
+                title="주식 총액"
+                current={data.stocks.reduce((s, p) => s + p.valueKRW, 0)}
+                prev={data.summary.prevStockTotal}
+              />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <SubPieChart data={stockPieData()} title="주식" />
                 <CategoryTrendChart dataKey="stocks" title="주식" color="#3b82f6" />
@@ -241,6 +405,11 @@ export default function Home() {
           {/* 크립토 탭 */}
           {tab === "crypto" && (
             <div className="space-y-6">
+              <CategoryHeader
+                title="크립토 총액"
+                current={data.crypto.reduce((s, c) => s + c.valueKRW, 0)}
+                prev={data.summary.prevCryptoTotal}
+              />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <SubPieChart data={cryptoPieData()} title="크립토" />
                 <CategoryTrendChart dataKey="crypto" title="크립토" color="#f59e0b" />
@@ -252,17 +421,32 @@ export default function Home() {
           {/* 연금 탭 */}
           {tab === "pension" && (
             <div className="space-y-6">
+              <CategoryHeader
+                title="연금 총액"
+                current={pensionTotal}
+                prev={data.summary.prevPensionTotal}
+              />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <SubPieChart data={pensionPieData()} title="연금" />
                 <CategoryTrendChart dataKey="pension" title="연금" color="#ec4899" />
               </div>
-              <PensionCard pension={data.pension} month={month} onDataChanged={fetchData} />
+              <PensionCard
+                pension={data.pension}
+                month={month}
+                onDataChanged={fetchData}
+                colors={PENSION_COLORS}
+              />
             </div>
           )}
 
           {/* 부동산 탭 */}
           {tab === "property" && (
             <div className="space-y-6">
+              <CategoryHeader
+                title="부동산 총액"
+                current={data.realEstate.reduce((s, r) => s + r.amount, 0)}
+                prev={data.summary.prevRealEstateTotal}
+              />
               <CategoryTrendChart dataKey="realEstate" title="부동산" color="#8b5cf6" />
               {data.realEstate.map((re) => (
                 <div
@@ -282,7 +466,17 @@ export default function Home() {
           )}
 
           {/* 부채 탭 */}
-          {tab === "debt" && <LiabilityCard liabilities={data.liabilities} month={month} onDataChanged={fetchData} />}
+          {tab === "debt" && (
+            <div className="space-y-6">
+              <CategoryHeader
+                title="부채 총액"
+                current={data.liabilities.reduce((s, l) => s + l.amount, 0)}
+                prev={data.summary.prevLiabilityTotal}
+                inverseColor
+              />
+              <LiabilityCard liabilities={data.liabilities} month={month} onDataChanged={fetchData} />
+            </div>
+          )}
         </>
       )}
     </main>

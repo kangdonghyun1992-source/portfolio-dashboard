@@ -11,11 +11,13 @@ export interface StockPosition {
   name: string;
   ticker: string;
   quantity: number;
+  avgPrice: number;
   currentPrice: number;
   currency: "USD" | "KRW";
   valueUSD: number | null;
   valueKRW: number;
   category: string;
+  prevValueKRW?: number;
 }
 
 export interface CryptoPosition {
@@ -28,6 +30,8 @@ export interface CryptoPosition {
   currentPrice: number;
   valueKRW: number;
   pnlPercent: number;
+  category: string;
+  prevValueKRW?: number;
 }
 
 export interface Liability {
@@ -60,6 +64,12 @@ export interface Summary {
   fxRate: number;
   prevTotalAssets?: number;
   prevNetWorth?: number;
+  prevCashTotal?: number;
+  prevStockTotal?: number;
+  prevCryptoTotal?: number;
+  prevPensionTotal?: number;
+  prevRealEstateTotal?: number;
+  prevLiabilityTotal?: number;
 }
 
 export interface AssetAllocation {

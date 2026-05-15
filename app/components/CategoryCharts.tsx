@@ -12,7 +12,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  type PieLabelRenderProps,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -40,8 +39,9 @@ export function SubPieChart({
   data: { name: string; value: number; color: string }[];
   title: string;
 }) {
-  const filtered = data.filter((d) => d.value > 0);
+  const filtered = [...data].filter((d) => d.value > 0).sort((a, b) => b.value - a.value);
   if (filtered.length === 0) return null;
+  const total = filtered.reduce((s, d) => s + d.value, 0);
 
   return (
     <Card>
@@ -49,37 +49,49 @@ export function SubPieChart({
         <CardTitle className="text-base">{title} 구성</CardTitle>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={220}>
-          <PieChart>
-            <Pie
-              data={filtered}
-              cx="50%"
-              cy="50%"
-              innerRadius={45}
-              outerRadius={85}
-              paddingAngle={2}
-              dataKey="value"
-              nameKey="name"
-              label={(props: PieLabelRenderProps) => {
-                const pct = props.percent
-                  ? (Number(props.percent) * 100).toFixed(0)
-                  : "0";
-                return `${props.name ?? ""} ${pct}%`;
-              }}
-              labelLine={false}
-            >
-              {filtered.map((entry, i) => (
-                <Cell key={i} fill={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip
-              formatter={(value) => [
-                `${formatKRW(Number(value))}원`,
-                "금액",
-              ]}
-            />
-          </PieChart>
-        </ResponsiveContainer>
+        <div className="flex items-center gap-4">
+          <div className="w-[180px] h-[180px] flex-shrink-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={filtered}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={80}
+                  paddingAngle={2}
+                  dataKey="value"
+                  nameKey="name"
+                >
+                  {filtered.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value) => [
+                    `${formatKRW(Number(value))}원`,
+                    "금액",
+                  ]}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="space-y-1.5 flex-1">
+            {filtered.map((d) => (
+              <div key={d.name} className="flex items-center gap-2">
+                <div
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: d.color }}
+                />
+                <span className="text-sm flex-1 truncate">{d.name}</span>
+                <span className="text-sm font-medium tabular-nums">{(d.value / total * 100).toFixed(0)}%</span>
+                <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+                  {formatKRW(d.value)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

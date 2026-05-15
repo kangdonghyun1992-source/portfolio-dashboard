@@ -32,7 +32,7 @@ export default function LiabilityCard({ liabilities, month, onDataChanged }: { l
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {liabilities.map((l) =>
+        {[...liabilities].sort((a, b) => b.amount - a.amount).map((l) =>
           editId === l.id ? (
             <div key={l.id} className="p-3 rounded-lg bg-muted/30 space-y-2">
               <input className="w-full bg-muted/50 rounded px-2 py-1 text-sm" placeholder="부채명" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />

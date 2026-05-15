@@ -40,7 +40,7 @@ export default function CashTable({ cash, month, onDataChanged }: { cash: CashAs
             </TableRow>
           </TableHeader>
           <TableBody>
-            {cash.map((c) =>
+            {[...cash].sort((a, b) => b.amount - a.amount).map((c) =>
               editId === c.id ? (
                 <TableRow key={c.id}>
                   <TableCell><input className="w-full bg-muted/50 rounded px-2 py-1 text-sm" value={form.account} onChange={(e) => setForm({ ...form, account: e.target.value })} /></TableCell>

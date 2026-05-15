@@ -1,104 +1,13 @@
-// Strategic Asset Allocation targets from portfolio.md
-// Based on investable assets (excluding real estate)
-
 export interface SAATarget {
+  id?: number;
   name: string;
   targetPercent: number;
-  band: number; // ± tolerance
-  tickers: string[]; // matching tickers or asset names
+  band: number;
+  tickers: string[];
   color: string;
+  sortOrder?: number;
+  cashFloor?: number;
 }
-
-export const SAA_TARGETS: SAATarget[] = [
-  {
-    name: "ETH",
-    targetPercent: 15,
-    band: 5,
-    tickers: ["ETH"],
-    color: "#818cf8",
-  },
-  {
-    name: "BTC",
-    targetPercent: 15,
-    band: 5,
-    tickers: ["BTC"],
-    color: "#f97316",
-  },
-  {
-    name: "스테이블/파밍",
-    targetPercent: 10,
-    band: 2,
-    tickers: ["USDC", "USDT", "USD.AI", "USDe", "sENA", "ENA"],
-    color: "#22c55e",
-  },
-  {
-    name: "알트 크립토",
-    targetPercent: 3,
-    band: 2,
-    tickers: ["SOL", "ONDO", "PENDLE", "PENGU + 알파"],
-    color: "#06b6d4",
-  },
-  {
-    name: "Bucket A (배당)",
-    targetPercent: 10,
-    band: 3,
-    tickers: ["SCHD", "KO", "JNJ", "PG"],
-    color: "#3b82f6",
-  },
-  {
-    name: "Bucket B (컴파운더)",
-    targetPercent: 10,
-    band: 3,
-    tickers: ["BRK.B", "AAPL", "GOOGL"],
-    color: "#8b5cf6",
-  },
-  {
-    name: "GLD",
-    targetPercent: 5,
-    band: 2,
-    tickers: ["GLD"],
-    color: "#eab308",
-  },
-  {
-    name: "위성",
-    targetPercent: 5,
-    band: 2,
-    tickers: ["AXP", "UNH", "OXY"],
-    color: "#14b8a6",
-  },
-  {
-    name: "두나무",
-    targetPercent: 1,
-    band: 1,
-    tickers: ["비상장"],
-    color: "#ec4899",
-  },
-  {
-    name: "Scout (구리)",
-    targetPercent: 1,
-    band: 1,
-    tickers: ["KOSPI", "TIGER"],
-    color: "#84cc16",
-  },
-  {
-    name: "BN",
-    targetPercent: 3,
-    band: 2,
-    tickers: ["BN"],
-    color: "#6366f1",
-  },
-  {
-    name: "SGOV",
-    targetPercent: 2,
-    band: 2,
-    tickers: ["SGOV"],
-    color: "#a3a3a3",
-  },
-];
-
-// Cash target: 20% (13% hard floor)
-export const CASH_TARGET = 20;
-export const CASH_FLOOR = 13;
 
 export interface SAAResult {
   name: string;
@@ -107,47 +16,65 @@ export interface SAAResult {
   currentAmount: number;
   band: number;
   status: "ok" | "warning" | "danger";
-  diff: number; // currentPercent - targetPercent
-  rebalanceAmount: number; // amount to buy(+) or sell(-)
+  diff: number;
+  rebalanceAmount: number;
   color: string;
 }
 
 export function calculateSAA(
   stocks: { ticker: string; name: string; valueKRW: number }[],
   crypto: { name: string; ticker: string; valueKRW: number }[],
-  cashTotal: number
+  cashTotal: number,
+  targets: SAATarget[]
 ): SAAResult[] {
-  // Investable total = cash + stocks + crypto
   const stockTotal = stocks.reduce((s, p) => s + p.valueKRW, 0);
   const cryptoTotal = crypto.reduce((s, p) => s + p.valueKRW, 0);
   const investableTotal = cashTotal + stockTotal + cryptoTotal;
 
-  if (investableTotal === 0) return [];
+  if (investableTotal === 0 || targets.length === 0) return [];
 
   const results: SAAResult[] = [];
 
-  for (const target of SAA_TARGETS) {
-    // Find matching positions
+  // Find the cash target (has cashFloor > 0 or name includes "현금")
+  let cashTarget: SAATarget | undefined;
+  const assetTargets: SAATarget[] = [];
+
+  for (const target of targets) {
+    if (target.cashFloor && target.cashFloor > 0) {
+      cashTarget = target;
+    } else {
+      assetTargets.push(target);
+    }
+  }
+
+  function matches(tickers: string[], name: string, ticker: string): boolean {
+    const nameLower = name.toLowerCase();
+    const tickerLower = ticker.toLowerCase();
+    // strip exchange prefix: "NYSE:KO" → "KO", "NYSEARCA:GLD" → "GLD"
+    const tickerBase = (ticker.split(":").pop() ?? ticker).toLowerCase();
+    return tickers.some((t) => {
+      const tl = t.toLowerCase();
+      // Exact matches (always safe)
+      if (tickerBase === tl || tickerLower === tl || nameLower === tl) return true;
+      // Only use includes for longer strings (4+ chars) to avoid "eth" matching "ethena"
+      if (tl.length >= 4 && nameLower.length >= 4) {
+        if (nameLower === tl || tl === nameLower) return true;
+      }
+      return false;
+    });
+  }
+
+  for (const target of assetTargets) {
     let currentAmount = 0;
 
     for (const s of stocks) {
-      // Match by ticker suffix or name
-      const tickerBase = s.ticker.split(":").pop() ?? s.ticker;
-      if (
-        target.tickers.some(
-          (t) => tickerBase === t || s.ticker === t || s.name.includes(t)
-        )
-      ) {
+      if (matches(target.tickers, s.name, s.ticker)) {
         currentAmount += s.valueKRW;
       }
     }
 
     for (const c of crypto) {
-      if (
-        target.tickers.some(
-          (t) => c.name === t || c.ticker === t || c.name.includes(t)
-        )
-      ) {
+      if (matches(target.tickers, c.name, c.ticker)) {
         currentAmount += c.valueKRW;
       }
     }
@@ -181,28 +108,30 @@ export function calculateSAA(
     });
   }
 
-  // Add cash
-  const cashPercent =
-    Math.round((cashTotal / investableTotal) * 1000) / 10;
-  const cashDiff = Math.round((cashPercent - CASH_TARGET) * 10) / 10;
-  results.push({
-    name: "현금",
-    targetPercent: CASH_TARGET,
-    currentPercent: cashPercent,
-    currentAmount: cashTotal,
-    band: 7,
-    status:
-      cashPercent < CASH_FLOOR
-        ? "danger"
-        : Math.abs(cashDiff) > 7
-          ? "warning"
-          : "ok",
-    diff: cashDiff,
-    rebalanceAmount: Math.round(
-      ((CASH_TARGET - cashPercent) / 100) * investableTotal
-    ),
-    color: "#22c55e",
-  });
+  // Add cash row
+  if (cashTarget) {
+    const cashPercent = Math.round((cashTotal / investableTotal) * 1000) / 10;
+    const cashDiff = Math.round((cashPercent - cashTarget.targetPercent) * 10) / 10;
+    const floor = cashTarget.cashFloor ?? 13;
+    results.push({
+      name: cashTarget.name,
+      targetPercent: cashTarget.targetPercent,
+      currentPercent: cashPercent,
+      currentAmount: cashTotal,
+      band: cashTarget.band,
+      status:
+        cashPercent < floor
+          ? "danger"
+          : Math.abs(cashDiff) > cashTarget.band
+            ? "warning"
+            : "ok",
+      diff: cashDiff,
+      rebalanceAmount: Math.round(
+        ((cashTarget.targetPercent - cashPercent) / 100) * investableTotal
+      ),
+      color: cashTarget.color,
+    });
+  }
 
   return results;
 }

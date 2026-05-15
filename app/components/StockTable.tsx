@@ -5,24 +5,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { StockPosition } from "@/lib/types";
 import { useCrud } from "@/lib/use-crud";
+import CategoryPicker, { Badge } from "./CategoryPicker";
 
-const CATEGORY_COLORS: Record<string, string> = {
-  "Bucket A": "bg-blue-500/20 text-blue-400",
-  "Bucket B": "bg-purple-500/20 text-purple-400",
-  "매크로 헤지": "bg-amber-500/20 text-amber-400",
-  위성: "bg-cyan-500/20 text-cyan-400",
-  Scout: "bg-green-500/20 text-green-400",
-  두나무: "bg-pink-500/20 text-pink-400",
-  BN: "bg-indigo-500/20 text-indigo-400",
-  "적립(비투자)": "bg-gray-500/20 text-gray-400",
-};
+const DEFAULT_CATEGORIES = ["국내주식", "해외주식", "ETF", "배당주", "성장주", "기타"];
 
-function Badge({ label }: { label: string }) {
-  const color = CATEGORY_COLORS[label] ?? "bg-muted text-muted-foreground";
-  return <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>{label}</span>;
+const EMPTY = { platform: "토스증권", name: "", ticker: "", quantity: "", avg_price: "", current_price: "", value_usd: "", value_krw: "", category: "기타", currency: "USD" };
+
+function formatKRW(v: number): string {
+  const abs = Math.abs(v);
+  if (abs >= 100_000_000) return `${(v / 100_000_000).toFixed(1)}억`;
+  if (abs >= 10_000) return `${Math.round(v / 10_000).toLocaleString("ko-KR")}만`;
+  return v.toLocaleString("ko-KR");
 }
-
-const EMPTY = { platform: "토스증권", name: "", ticker: "", quantity: "", current_price: "", value_usd: "", value_krw: "", category: "기타", currency: "USD" };
 
 export default function StockTable({ stocks, month, onDataChanged }: { stocks: StockPosition[]; month?: string; onDataChanged?: () => void }) {
   const total = stocks.reduce((sum, s) => sum + s.valueKRW, 0);
@@ -32,6 +26,9 @@ export default function StockTable({ stocks, month, onDataChanged }: { stocks: S
   const [showAdd, setShowAdd] = useState(false);
   const [fetching, setFetching] = useState(false);
   const editable = !!month;
+
+  // Collect all categories from data + defaults
+  const allCategories = Array.from(new Set([...DEFAULT_CATEGORIES, ...stocks.map((s) => s.category || "기타")]));
 
   const fetchPrice = useCallback(async (ticker: string, quantity: string) => {
     if (!ticker || !quantity || Number(quantity) === 0) return;
@@ -54,14 +51,18 @@ export default function StockTable({ stocks, month, onDataChanged }: { stocks: S
 
   function startEdit(s: StockPosition) {
     setEditId(s.id!);
-    setForm({ platform: s.platform, name: s.name, ticker: s.ticker, quantity: String(s.quantity), current_price: String(s.currentPrice), value_usd: s.valueUSD != null ? String(s.valueUSD) : "", value_krw: String(s.valueKRW), category: s.category, currency: s.currency });
+    setForm({ platform: s.platform, name: s.name, ticker: s.ticker, quantity: String(s.quantity), avg_price: s.avgPrice ? String(s.avgPrice) : "", current_price: String(s.currentPrice), value_usd: s.valueUSD != null ? String(s.valueUSD) : "", value_krw: String(s.valueKRW), category: s.category, currency: s.currency });
   }
 
   function saveForm(id?: number) {
-    const vals = { ...form, quantity: Number(form.quantity), current_price: Number(form.current_price), value_usd: form.value_usd ? Number(form.value_usd) : null, value_krw: Number(form.value_krw), domestic: form.currency === "KRW" ? 1 : 0 };
+    const vals = { ...form, quantity: Number(form.quantity), avg_price: form.avg_price ? Number(form.avg_price) : 0, current_price: Number(form.current_price), value_usd: form.value_usd ? Number(form.value_usd) : null, value_krw: Number(form.value_krw), domestic: form.currency === "KRW" ? 1 : 0 };
     if (id) { updateRow(id, vals as Record<string, string | number>); setEditId(null); }
     else { addRow(vals as Record<string, string | number>); setShowAdd(false); }
     setForm(EMPTY);
+  }
+
+  function handleCategoryChange(stockId: number, newCategory: string) {
+    updateRow(stockId, { category: newCategory });
   }
 
   const sorted = [...stocks].sort((a, b) => b.valueKRW - a.valueKRW);
@@ -95,14 +96,21 @@ export default function StockTable({ stocks, month, onDataChanged }: { stocks: S
             onBlur={() => fetchPrice(form.ticker, form.quantity)}
           />
         </TableCell>
-        <TableCell className="text-right text-sm tabular-nums">
-          {fetching ? <span className="text-muted-foreground">조회중...</span> : form.current_price ? `$${Number(form.current_price).toLocaleString("en-US")}` : "-"}
+        <TableCell>
+          <input className="w-20 bg-muted/50 rounded px-2 py-1 text-sm text-right" placeholder="매수가" value={form.avg_price}
+            onChange={(e) => setForm({ ...form, avg_price: e.target.value })}
+          />
         </TableCell>
+        <TableCell className="text-right text-sm tabular-nums">
+          {fetching ? <span className="text-muted-foreground">조회중...</span> : form.current_price ? `${form.currency === "USD" ? "$" : ""}${Number(form.current_price).toLocaleString("en-US")}` : "-"}
+        </TableCell>
+        <TableCell className="text-right text-sm tabular-nums text-muted-foreground">-</TableCell>
         <TableCell className="text-right text-sm tabular-nums">
           {form.value_krw ? Number(form.value_krw).toLocaleString("ko-KR") : "-"}
         </TableCell>
+        <TableCell className="text-right text-sm tabular-nums text-muted-foreground">-</TableCell>
         <TableCell>
-          <input className="w-20 bg-muted/50 rounded px-2 py-1 text-xs" placeholder="카테고리" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+          <CategoryPicker value={form.category} onChange={(v) => setForm({ ...form, category: v })} allCategories={allCategories} />
         </TableCell>
         <TableCell>
           <div className="flex gap-1">
@@ -132,8 +140,11 @@ export default function StockTable({ stocks, month, onDataChanged }: { stocks: S
               <TableHead>종목</TableHead>
               <TableHead>티커</TableHead>
               <TableHead className="text-right">수량</TableHead>
+              <TableHead className="text-right">매수가</TableHead>
               <TableHead className="text-right">현재가</TableHead>
+              <TableHead className="text-right">수익률</TableHead>
               <TableHead className="text-right">평가금(원)</TableHead>
+              <TableHead className="text-right">전월 대비</TableHead>
               <TableHead>카테고리</TableHead>
               <TableHead className="w-24"></TableHead>
             </TableRow>
@@ -146,9 +157,36 @@ export default function StockTable({ stocks, month, onDataChanged }: { stocks: S
                     <TableCell className="font-medium">{s.name}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{s.ticker}</TableCell>
                     <TableCell className="text-right tabular-nums">{s.quantity.toFixed(2)}</TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {s.avgPrice > 0 ? `${s.currency === "USD" ? "$" : ""}${s.avgPrice.toLocaleString("ko-KR")}` : "-"}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{s.currency === "USD" ? "$" : ""}{s.currentPrice.toLocaleString("ko-KR")}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {s.avgPrice > 0 ? (() => {
+                        const pnl = ((s.currentPrice - s.avgPrice) / s.avgPrice) * 100;
+                        const cls = pnl >= 0 ? "text-emerald-400" : "text-red-400";
+                        return <span className={cls}>{pnl >= 0 ? "+" : ""}{pnl.toFixed(1)}%</span>;
+                      })() : <span className="text-muted-foreground">-</span>}
+                    </TableCell>
                     <TableCell className="text-right font-medium tabular-nums">{s.valueKRW.toLocaleString("ko-KR")}</TableCell>
-                    <TableCell>{i === 0 && <Badge label={category} />}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {s.prevValueKRW != null ? (() => {
+                        const diff = s.valueKRW - s.prevValueKRW;
+                        const cls = diff >= 0 ? "text-emerald-400" : "text-red-400";
+                        return <span className={cls}>{diff >= 0 ? "+" : "-"}{formatKRW(Math.abs(diff))}</span>;
+                      })() : <span className="text-muted-foreground">-</span>}
+                    </TableCell>
+                    <TableCell>
+                      {editable ? (
+                        <CategoryPicker
+                          value={s.category || "기타"}
+                          onChange={(v) => handleCategoryChange(s.id!, v)}
+                          allCategories={allCategories}
+                        />
+                      ) : (
+                        <Badge label={s.category || "기타"} />
+                      )}
+                    </TableCell>
                     <TableCell>
                       {editable && (
                         <div className="flex gap-1">

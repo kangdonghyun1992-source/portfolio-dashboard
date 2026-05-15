@@ -12,54 +12,61 @@ function formatKRW(value: number): string {
 
 export default function AllocationChart({
   allocation,
+  title = "자산 배분",
 }: {
   allocation: AssetAllocation[];
+  title?: string;
 }) {
+  const sorted = [...allocation].sort((a, b) => b.amount - a.amount);
+  const total = sorted.reduce((s, a) => s + a.amount, 0);
   return (
     <Card>
       <CardHeader>
-        <CardTitle>자산 배분</CardTitle>
+        <CardTitle className="flex items-baseline justify-between gap-2">
+          <span>{title}</span>
+          <span className="text-base font-normal tabular-nums text-muted-foreground">
+            {total.toLocaleString("ko-KR")}원
+          </span>
+        </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col md:flex-row items-center gap-6">
-          <ResponsiveContainer width="100%" height={280}>
-            <PieChart>
-              <Pie
-                data={allocation}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={110}
-                paddingAngle={2}
-                dataKey="amount"
-                nameKey="category"
-                label={(props: PieLabelRenderProps) =>
-                  `${props.name ?? ""} ${props.percent ?? 0}%`
-                }
-                labelLine={false}
-              >
-                {allocation.map((entry, i) => (
-                  <Cell key={i} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(value) => [
-                  `${formatKRW(Number(value))}원`,
-                  "금액",
-                ]}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="space-y-2 min-w-[180px]">
-            {allocation.map((a) => (
+        <div className="flex items-center gap-4">
+          <div className="w-[200px] h-[200px] flex-shrink-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={sorted}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={90}
+                  paddingAngle={2}
+                  dataKey="amount"
+                  nameKey="category"
+                >
+                  {sorted.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value) => [
+                    `${formatKRW(Number(value))}원`,
+                    "금액",
+                  ]}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="space-y-2 flex-1">
+            {sorted.map((a) => (
               <div key={a.category} className="flex items-center gap-2">
                 <div
-                  className="w-3 h-3 rounded-full"
+                  className="w-3 h-3 rounded-full flex-shrink-0"
                   style={{ backgroundColor: a.color }}
                 />
                 <span className="text-sm flex-1">{a.category}</span>
                 <span className="text-sm font-medium">{a.percent}%</span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
                   {formatKRW(a.amount)}
                 </span>
               </div>

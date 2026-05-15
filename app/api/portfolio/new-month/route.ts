@@ -1,23 +1,26 @@
 import { NextResponse } from "next/server";
 import getDb from "@/lib/db";
+import { getAuthUser } from "@/lib/get-user";
 
 export async function POST(request: Request) {
   try {
+    const { userId, error } = await getAuthUser();
+    if (!userId) return error!;
+
     const { month } = await request.json();
     const monthKey = `2026-${month}`;
     const prevMonth = `2026-${String(Math.max(1, parseInt(month) - 1)).padStart(2, "0")}`;
     const db = getDb();
 
-    const existing = await db.prepare("SELECT month FROM summary WHERE month = ?").get(monthKey);
+    const existing = await db.prepare("SELECT month FROM summary WHERE user_id = ? AND month = ?").get(userId, monthKey);
     if (existing) {
       return NextResponse.json({ success: true, message: "이미 존재합니다" });
     }
 
-    await db.prepare(`INSERT INTO summary (month, total_assets, total_liabilities, net_worth, fx_rate)
-      SELECT ?, total_assets, total_liabilities, net_worth, fx_rate FROM summary WHERE month = ?`).run(monthKey, prevMonth);
+    await db.prepare(`INSERT INTO summary (user_id, month, total_assets, total_liabilities, net_worth, fx_rate)
+      SELECT ?, ?, total_assets, total_liabilities, net_worth, fx_rate FROM summary WHERE user_id = ? AND month = ?`).run(userId, monthKey, userId, prevMonth);
 
     const tables = ["cash", "stocks", "crypto", "liabilities", "pension", "real_estate"];
-    // For each table, copy rows from prev month. We need to know the columns.
     const colMap: Record<string, string> = {
       cash: "account, amount, note",
       stocks: "platform, name, ticker, quantity, current_price, currency, value_usd, value_krw, category, domestic",
@@ -29,7 +32,7 @@ export async function POST(request: Request) {
 
     for (const table of tables) {
       const cols = colMap[table];
-      await db.prepare(`INSERT INTO ${table} (month, ${cols}) SELECT ?, ${cols} FROM ${table} WHERE month = ?`).run(monthKey, prevMonth);
+      await db.prepare(`INSERT INTO ${table} (user_id, month, ${cols}) SELECT ?, ?, ${cols} FROM ${table} WHERE user_id = ? AND month = ?`).run(userId, monthKey, userId, prevMonth);
     }
 
     return NextResponse.json({ success: true, created: monthKey });
