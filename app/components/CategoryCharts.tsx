@@ -103,10 +103,12 @@ export function CategoryTrendChart({
   dataKey,
   title,
   color,
+  refreshKey = 0,
 }: {
   dataKey: string;
   title: string;
   color: string;
+  refreshKey?: number;
 }) {
   const [data, setData] = useState<HistoryPoint[]>([]);
 
@@ -115,7 +117,7 @@ export function CategoryTrendChart({
       .then((r) => r.json())
       .then((d) => setData(d))
       .catch(() => {});
-  }, []);
+  }, [refreshKey]);
 
   if (data.length < 2) return null;
 

@@ -23,7 +23,7 @@ function formatAxis(v: number): string {
   return `${(v / 100_000_000).toFixed(1)}억`;
 }
 
-export default function NetWorthChart() {
+export default function NetWorthChart({ refreshKey = 0 }: { refreshKey?: number }) {
   const [data, setData] = useState<HistoryPoint[]>([]);
 
   useEffect(() => {
@@ -31,7 +31,7 @@ export default function NetWorthChart() {
       .then((r) => r.json())
       .then((d) => setData(d))
       .catch(() => {});
-  }, []);
+  }, [refreshKey]);
 
   if (data.length < 2) return null;
 

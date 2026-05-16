@@ -74,6 +74,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saaTargets, setSaaTargets] = useState<SAATarget[]>([]);
+  const [historyKey, setHistoryKey] = useState(0);
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
@@ -159,6 +160,8 @@ export default function Home() {
         ];
         return next;
       });
+      // 차트(NetWorthChart, CategoryTrendChart)가 history API를 다시 가져오도록 트리거
+      setHistoryKey((k) => k + 1);
     },
     []
   );
@@ -388,7 +391,7 @@ export default function Home() {
           {/* 전체 탭: 순자산 추이 + 파이차트 + 리밸런싱 현황 */}
           {tab === "overview" && (
             <div className="space-y-6">
-              <NetWorthChart />
+              <NetWorthChart refreshKey={historyKey} />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <AllocationChart allocation={data.allocation} title="자산 배분 (총자산)" />
                 <AllocationChart allocation={netWorthAllocation()} title="자산 배분 (순자산)" />
@@ -423,7 +426,7 @@ export default function Home() {
               />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <SubPieChart data={cashPieData()} title="현금" />
-                <CategoryTrendChart dataKey="cash" title="현금" color="#22c55e" />
+                <CategoryTrendChart dataKey="cash" title="현금" color="#22c55e" refreshKey={historyKey} />
               </div>
               <CashTable cash={data.cash} month={month} onChange={applyChange} />
             </div>
@@ -439,7 +442,7 @@ export default function Home() {
               />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <SubPieChart data={stockPieData()} title="주식" />
-                <CategoryTrendChart dataKey="stocks" title="주식" color="#3b82f6" />
+                <CategoryTrendChart dataKey="stocks" title="주식" color="#3b82f6" refreshKey={historyKey} />
               </div>
               <StockTable stocks={data.stocks} month={month} onChange={applyChange} />
             </div>
@@ -455,7 +458,7 @@ export default function Home() {
               />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <SubPieChart data={cryptoPieData()} title="크립토" />
-                <CategoryTrendChart dataKey="crypto" title="크립토" color="#f59e0b" />
+                <CategoryTrendChart dataKey="crypto" title="크립토" color="#f59e0b" refreshKey={historyKey} />
               </div>
               <CryptoTable crypto={data.crypto} month={month} onChange={applyChange} />
             </div>
@@ -471,7 +474,7 @@ export default function Home() {
               />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <SubPieChart data={pensionPieData()} title="연금" />
-                <CategoryTrendChart dataKey="pension" title="연금" color="#ec4899" />
+                <CategoryTrendChart dataKey="pension" title="연금" color="#ec4899" refreshKey={historyKey} />
               </div>
               <PensionCard
                 pension={data.pension}
@@ -490,7 +493,7 @@ export default function Home() {
                 current={data.realEstate.reduce((s, r) => s + r.amount, 0)}
                 prev={data.summary.prevRealEstateTotal}
               />
-              <CategoryTrendChart dataKey="realEstate" title="부동산" color="#8b5cf6" />
+              <CategoryTrendChart dataKey="realEstate" title="부동산" color="#8b5cf6" refreshKey={historyKey} />
               {data.realEstate.map((re) => (
                 <div
                   key={re.id}
