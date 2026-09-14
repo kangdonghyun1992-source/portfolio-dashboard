@@ -1,0 +1,726 @@
+<title>루프와 그래프 운용법</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#EDF0F3;
+    --surface:#FFFFFF;
+    --surface-sunk:#E3E8ED;
+    --ink:#141A21;
+    --ink-soft:#3C4753;
+    --muted:#65727F;
+    --rule:#C6D0D9;
+    --rule-soft:#DCE3E9;
+    --accent:#1F4D8F;
+    --accent-soft:#E2EAF6;
+    --warn:#A2501A;
+    --warn-soft:#F3E6DA;
+    --good:#1F6B4F;
+    --shadow:0 1px 2px rgba(20,26,33,.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#10151A;
+      --surface:#181E25;
+      --surface-sunk:#141A20;
+      --ink:#E3E9EF;
+      --ink-soft:#C2CCD6;
+      --muted:#8D9AA7;
+      --rule:#2C353E;
+      --rule-soft:#232B33;
+      --accent:#79A8E8;
+      --accent-soft:#1B2A3D;
+      --warn:#D28A50;
+      --warn-soft:#30241A;
+      --good:#5FB48D;
+      --shadow:0 1px 2px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#10151A;
+    --surface:#181E25;
+    --surface-sunk:#141A20;
+    --ink:#E3E9EF;
+    --ink-soft:#C2CCD6;
+    --muted:#8D9AA7;
+    --rule:#2C353E;
+    --rule-soft:#232B33;
+    --accent:#79A8E8;
+    --accent-soft:#1B2A3D;
+    --warn:#D28A50;
+    --warn-soft:#30241A;
+    --good:#5FB48D;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);
+    color:var(--ink);
+    font-family:"IBM Plex Sans KR","Noto Sans KR",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-weight:300;
+    line-height:1.78;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:760px;
+    margin:0 auto;
+    padding-inline:20px;
+    padding-block:56px 88px;
+  }
+
+  /* ---- masthead ---- */
+  .masthead{border-bottom:2px solid var(--ink);padding-bottom:26px;margin-bottom:8px}
+  .eyebrow{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 14px;
+  }
+  h1{
+    font-family:"Gowun Batang","Noto Serif KR",serif;
+    font-weight:700;
+    font-size:clamp(32px,7vw,46px);
+    line-height:1.22;
+    letter-spacing:-.01em;
+    margin:0 0 14px;
+    text-wrap:balance;
+  }
+  .dek{font-size:16px;color:var(--ink-soft);margin:0;max-width:56ch;text-wrap:pretty}
+  .byline{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:11px;color:var(--muted);
+    margin:22px 0 0;display:flex;flex-wrap:wrap;gap:6px 18px;
+  }
+
+  /* ---- table of contents ---- */
+  .toc{
+    margin:40px 0 0;padding:0;list-style:none;
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+    gap:2px 24px;
+    border-top:1px solid var(--rule-soft);
+    border-bottom:1px solid var(--rule-soft);
+    padding-block:16px;
+  }
+  .toc a{
+    color:var(--ink-soft);text-decoration:none;font-size:13.5px;
+    display:flex;gap:10px;align-items:baseline;
+    border-bottom:1px solid transparent;
+  }
+  .toc a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+  .toc .n{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted)}
+
+  /* ---- sections ---- */
+  section{margin-top:56px;scroll-margin-top:24px}
+  h2{
+    font-family:"Gowun Batang","Noto Serif KR",serif;
+    font-weight:700;font-size:clamp(23px,4.4vw,29px);line-height:1.3;
+    margin:0 0 4px;letter-spacing:-.005em;text-wrap:balance;
+    padding-top:14px;border-top:2px solid var(--ink);
+  }
+  h3{
+    font-size:16px;font-weight:600;margin:34px 0 8px;
+    color:var(--ink);letter-spacing:-.005em;
+  }
+  h4{font-size:14px;font-weight:600;margin:22px 0 6px;color:var(--ink-soft)}
+  p{margin:0 0 15px;max-width:66ch}
+  a{color:var(--accent)}
+  strong{font-weight:600;color:var(--ink)}
+  em{font-style:normal;background:var(--accent-soft);padding:0 4px;border-radius:2px}
+  ul,ol{margin:0 0 15px;padding-left:20px;max-width:66ch}
+  li{margin-bottom:7px}
+  li::marker{color:var(--muted)}
+
+  .lead{font-size:16.5px;color:var(--ink-soft)}
+
+  /* ---- callouts ---- */
+  .note{
+    border-left:3px solid var(--accent);
+    background:var(--surface);
+    padding:16px 18px;margin:24px 0;border-radius:0 3px 3px 0;
+    font-size:14.5px;box-shadow:var(--shadow);
+  }
+  .note.caution{border-left-color:var(--warn);background:var(--warn-soft)}
+  .note p:last-child{margin-bottom:0}
+  .note .tag{
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--accent);
+    display:block;margin-bottom:6px;
+  }
+  .note.caution .tag{color:var(--warn)}
+
+  /* ---- definition strip ---- */
+  .defs{
+    display:grid;gap:0;margin:26px 0;
+    border:1px solid var(--rule);border-radius:3px;overflow:hidden;background:var(--surface);
+  }
+  .defs > div{padding:14px 18px;border-bottom:1px solid var(--rule-soft)}
+  .defs > div:last-child{border-bottom:0}
+  .defs dt,.defs .k{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--muted);margin-bottom:3px;
+  }
+  .defs .v{font-size:14.5px;color:var(--ink-soft)}
+
+  /* ---- diagrams ---- */
+  .figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:20px;margin:30px 0}
+  figure{margin:0;background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:14px 14px 10px}
+  figure svg{width:100%;height:auto;display:block}
+  figcaption{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);
+    margin-top:8px;line-height:1.6;
+  }
+  .svg-box{fill:var(--surface-sunk);stroke:var(--rule);stroke-width:1}
+  .svg-box-a{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1}
+  .svg-t{fill:var(--ink);font-family:"IBM Plex Sans KR",sans-serif;font-size:12px;font-weight:500}
+  .svg-s{fill:var(--muted);font-family:"IBM Plex Mono",monospace;font-size:10px}
+  .svg-line{stroke:var(--muted);stroke-width:1.2;fill:none}
+
+  /* ---- tables ---- */
+  .tablewrap{overflow-x:auto;margin:24px 0;border:1px solid var(--rule);border-radius:3px;background:var(--surface)}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:460px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--rule-soft);vertical-align:top}
+  thead th{
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--muted);font-weight:500;
+    background:var(--surface-sunk);border-bottom:1px solid var(--rule);
+  }
+  tbody tr:last-child td{border-bottom:0}
+  td:first-child{font-weight:500;color:var(--ink);white-space:nowrap}
+
+  /* ---- code ---- */
+  pre{
+    background:var(--surface-sunk);border:1px solid var(--rule-soft);
+    border-radius:3px;padding:14px 16px;overflow-x:auto;margin:16px 0;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px;line-height:1.72;
+    color:var(--ink-soft);
+  }
+  code{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.9em;color:var(--ink)}
+  pre code{font-size:inherit;color:inherit}
+  .filename{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);
+    margin:16px 0 -8px;display:block;
+  }
+
+  /* ---- failure list ---- */
+  .fails{list-style:none;padding:0;margin:24px 0;display:grid;gap:1px;background:var(--rule-soft);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+  .fails li{margin:0;background:var(--surface);padding:16px 18px}
+  .fails .name{font-weight:600;font-size:14.5px;display:block;margin-bottom:4px}
+  .fails .name::before{content:"⨯";color:var(--warn);margin-right:8px;font-weight:400}
+  .fails .fix{font-size:13.5px;color:var(--ink-soft);display:block;margin-top:6px;padding-left:20px;border-left:2px solid var(--good)}
+  .fails p{margin:0;font-size:14px;color:var(--muted);padding-left:20px}
+
+  /* ---- checklist ---- */
+  .check{list-style:none;padding:0;margin:22px 0;counter-reset:c}
+  .check li{
+    counter-increment:c;position:relative;padding-left:38px;margin-bottom:16px;
+    font-size:14.5px;
+  }
+  .check li::before{
+    content:counter(c);position:absolute;left:0;top:2px;
+    width:24px;height:24px;border-radius:50%;border:1px solid var(--accent);
+    color:var(--accent);font-family:"IBM Plex Mono",monospace;font-size:11px;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  footer{
+    margin-top:70px;padding-top:22px;border-top:1px solid var(--rule);
+    font-size:13px;color:var(--muted);
+  }
+  footer p{max-width:66ch}
+
+  a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
+  @media (prefers-reduced-motion:no-preference){
+    .toc a{transition:color .15s ease,border-color .15s ease}
+  }
+  @media (max-width:480px){
+    .wrap{padding-block:36px 64px}
+    table{min-width:420px}
+  }
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">개인 의사결정 운영 매뉴얼</p>
+  <h1>루프와 그래프 운용법</h1>
+  <p class="dek">반복해서 돌리는 구조(루프)와 갈래로 쪼개서 붙이는 구조(그래프)를,
+  재무 관리 · 투자 아이디어 · 가치관 정립에 실제로 적용하는 방법.</p>
+  <p class="byline">
+    <span>작성 2026-09-14</span>
+    <span>대상 portfolio-dashboard</span>
+    <span>전제 비개발자</span>
+  </p>
+</header>
+
+<ul class="toc">
+  <li><a href="#terms"><span class="n">00</span><span>용어부터 짚고 간다</span></a></li>
+  <li><a href="#loop"><span class="n">01</span><span>루프란 무엇인가</span></a></li>
+  <li><a href="#graph"><span class="n">02</span><span>그래프란 무엇인가</span></a></li>
+  <li><a href="#choose"><span class="n">03</span><span>언제 무엇을 쓰나</span></a></li>
+  <li><a href="#finance"><span class="n">04</span><span>적용 ① 재무 관리</span></a></li>
+  <li><a href="#invest"><span class="n">05</span><span>적용 ② 투자 아이디어</span></a></li>
+  <li><a href="#values"><span class="n">06</span><span>적용 ③ 가치관</span></a></li>
+  <li><a href="#fail"><span class="n">07</span><span>망하는 방식 6가지</span></a></li>
+  <li><a href="#start"><span class="n">08</span><span>첫 주에 할 것</span></a></li>
+</ul>
+
+<!-- ============ 00 ============ -->
+<section id="terms">
+  <h2>용어부터 짚고 간다</h2>
+  <p class="lead">먼저 솔직하게. <strong>"루프 엔지니어링", "그래프 엔지니어링"은 업계 표준 용어가 아니다.</strong>
+  교과서나 논문에 정의된 항목이 아니고, 사람마다 다르게 쓴다. 나는 당신이 이 말을 어디서 봤는지 모르고,
+  그 출처가 말하는 정의와 이 문서가 일치한다고 보장할 수 없다.</p>
+
+  <p>다만 그 말이 가리키는 실체는 분명히 있다. 실무에서 확립된 두 가지 구조가 있고,
+  "루프"와 "그래프"는 그 둘의 별명에 가깝다.</p>
+
+  <div class="defs">
+    <div>
+      <div class="k">Loop — 에이전틱 루프 / 스케줄 실행</div>
+      <div class="v">같은 작업을 <strong>시간축으로 반복</strong>하되, 매 회차가 이전 회차의 결과를 입력으로 받는 구조.
+      ReAct 루프, cron job, 주기적 리뷰가 전부 여기에 속한다.</div>
+    </div>
+    <div>
+      <div class="k">Graph — DAG 오케스트레이션</div>
+      <div class="v">한 작업을 <strong>관점축으로 쪼개서</strong> 여러 갈래로 동시에 돌리고 다시 합치는 구조.
+      노드는 작업, 엣지는 의존 관계. LangGraph, 워크플로 도구, 멀티 에이전트가 여기에 속한다.</div>
+    </div>
+  </div>
+
+  <p>그래서 이 문서는 "그 용어의 정설"이 아니라,
+  <em>지금 당신이 쓰는 도구에서 실제로 실행 가능한 형태</em>로 두 구조를 번역한 것이다.
+  용어가 틀렸다고 누가 지적하면 그 사람 말이 맞을 수도 있다. 중요한 건 이름이 아니라 구조다.</p>
+</section>
+
+<!-- ============ 01 ============ -->
+<section id="loop">
+  <h2>루프란 무엇인가</h2>
+
+  <p class="lead">반복은 루프가 아니다. <strong>상태가 다음 회차로 넘어갈 때만</strong> 루프다.</p>
+
+  <p>매달 "내 자산 좀 봐줘"라고 새로 물어보는 건 루프가 아니라 그냥 반복이다.
+  매번 0에서 시작하니까 지난달에 무슨 판단을 했는지 모르고, 같은 조언이 계속 나온다.
+  루프가 되려면 <strong>지난 회차가 남긴 기록을 이번 회차가 읽어야</strong> 한다.</p>
+
+  <div class="figs">
+    <figure>
+      <svg viewBox="0 0 340 176" role="img" aria-label="관측, 판단, 기록 세 단계가 순환하고 기록이 다시 관측으로 돌아가는 루프 구조">
+        <defs>
+          <marker id="ah1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="var(--muted)"/>
+          </marker>
+        </defs>
+        <rect class="svg-box" x="6" y="26" width="94" height="42" rx="3"/>
+        <text class="svg-t" x="53" y="44" text-anchor="middle">관측</text>
+        <text class="svg-s" x="53" y="59" text-anchor="middle">숫자·시세</text>
+
+        <rect class="svg-box-a" x="123" y="26" width="94" height="42" rx="3"/>
+        <text class="svg-t" x="170" y="44" text-anchor="middle">판단</text>
+        <text class="svg-s" x="170" y="59" text-anchor="middle">차이·이상치</text>
+
+        <rect class="svg-box" x="240" y="26" width="94" height="42" rx="3"/>
+        <text class="svg-t" x="287" y="44" text-anchor="middle">기록</text>
+        <text class="svg-s" x="287" y="59" text-anchor="middle">md 파일</text>
+
+        <path class="svg-line" d="M100,47 L118,47" marker-end="url(#ah1)"/>
+        <path class="svg-line" d="M217,47 L235,47" marker-end="url(#ah1)"/>
+        <path class="svg-line" d="M287,68 L287,118 Q287,128 277,128 L63,128 Q53,128 53,118 L53,73" marker-end="url(#ah1)"/>
+        <text class="svg-s" x="170" y="146" text-anchor="middle">다음 회차의 입력 = 상태(state)</text>
+      </svg>
+      <figcaption>LOOP — 시간축 반복. 화살표가 닫히지 않으면 루프가 아니다.</figcaption>
+    </figure>
+
+    <figure>
+      <svg viewBox="0 0 340 176" role="img" aria-label="하나의 질문이 세 갈래로 나뉘어 병렬 검토된 뒤 다시 하나의 결론으로 합쳐지는 그래프 구조">
+        <defs>
+          <marker id="ah2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="var(--muted)"/>
+          </marker>
+        </defs>
+        <rect class="svg-box-a" x="120" y="6" width="100" height="34" rx="3"/>
+        <text class="svg-t" x="170" y="28" text-anchor="middle">질문 하나</text>
+
+        <rect class="svg-box" x="4" y="72" width="100" height="34" rx="3"/>
+        <text class="svg-t" x="54" y="94" text-anchor="middle">강세 근거</text>
+        <rect class="svg-box" x="120" y="72" width="100" height="34" rx="3"/>
+        <text class="svg-t" x="170" y="94" text-anchor="middle">약세 근거</text>
+        <rect class="svg-box" x="236" y="72" width="100" height="34" rx="3"/>
+        <text class="svg-t" x="286" y="94" text-anchor="middle">무효화 조건</text>
+
+        <rect class="svg-box-a" x="120" y="132" width="100" height="34" rx="3"/>
+        <text class="svg-t" x="170" y="154" text-anchor="middle">대조·결론</text>
+
+        <path class="svg-line" d="M150,40 Q54,48 54,67" marker-end="url(#ah2)"/>
+        <path class="svg-line" d="M170,40 L170,67" marker-end="url(#ah2)"/>
+        <path class="svg-line" d="M190,40 Q286,48 286,67" marker-end="url(#ah2)"/>
+        <path class="svg-line" d="M54,106 Q54,127 150,131" marker-end="url(#ah2)"/>
+        <path class="svg-line" d="M170,106 L170,127" marker-end="url(#ah2)"/>
+        <path class="svg-line" d="M286,106 Q286,127 190,131" marker-end="url(#ah2)"/>
+      </svg>
+      <figcaption>GRAPH — 관점축 분기. 갈래끼리 서로 안 보는 게 핵심이다.</figcaption>
+    </figure>
+  </div>
+
+  <h3>루프의 3요소</h3>
+  <p>루프 하나를 설계할 때 이 세 가지를 못 적으면 그건 아직 루프가 아니다.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>요소</th><th>질문</th><th>재무 루프 예시</th></tr></thead>
+      <tbody>
+        <tr><td>트리거</td><td>언제 돈다</td><td>매월 1일 09:10 (KST)</td></tr>
+        <tr><td>상태</td><td>무엇을 기억한다</td><td><code>docs/journal/</code> 안의 지난 회차 메모</td></tr>
+        <tr><td>종료조건</td><td>언제 멈춘다</td><td>없음 — 상시. 대신 <strong>회차당 출력 길이를 제한</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note caution">
+    <span class="tag">가장 흔한 실패</span>
+    <p>종료조건 없는 루프는 그냥 비용을 태우는 기계다. 상시 루프를 돌릴 거라면
+    "언제 멈추나" 대신 "회차당 무엇을 최대 몇 개까지 내놓나"를 반드시 못박아라.
+    그게 없으면 3개월 뒤 읽지 않는 리포트가 12개 쌓인다.</p>
+  </div>
+
+  <h3>당신은 이미 루프를 하나 돌리고 있다</h3>
+  <p>이 레포의 <code>vercel.json</code>에 이미 결정론적 루프가 하나 있다.</p>
+
+  <span class="filename">vercel.json</span>
+  <pre><code>{ "crons": [ { "path": "/api/cron/finalize-month",
+               "schedule": "10 0 1 * *" } ] }</code></pre>
+
+  <p>매월 1일 00:10 UTC(한국시간 09:10)에 전월 시세를 마지막으로 갱신하고 잠근다.
+  이게 <strong>결정론적 루프</strong>다 — 코드가 돌고, 매번 정확히 같은 일을 하고, 판단은 안 한다.
+  루프 엔지니어링은 이 위에 <strong>판단 루프</strong>를 한 층 얹는 작업이다.
+  숫자를 고정하는 건 코드가, 그 숫자가 무슨 뜻인지 묻는 건 판단 루프가 한다.</p>
+</section>
+
+<!-- ============ 02 ============ -->
+<section id="graph">
+  <h2>그래프란 무엇인가</h2>
+
+  <p class="lead">한 문맥 안에 다 밀어넣으면 <strong>관점이 서로 오염된다.</strong> 그래프는 그걸 막는 구조다.</p>
+
+  <p>"엔비디아 지금 어때?"라고 한 번에 물으면, 답변 하나 안에서 강세론과 약세론이
+  서로 눈치를 보며 타협한다. 결과는 "장기적으로는 긍정적이나 단기 변동성에 유의" 같은,
+  아무것도 결정하지 못하는 문장이다. 이건 모델이 멍청해서가 아니라
+  <strong>한 문맥에서 생성된 문장들은 앞 문장에 끌려가기 때문</strong>이다.</p>
+
+  <p>그래프는 이걸 물리적으로 분리한다. 강세 담당은 약세 논거를 못 보고, 약세 담당은 강세 논거를 못 본다.
+  각자 최선을 다해 논증한 뒤, 마지막 노드에서 <strong>합치는 게 아니라 대조</strong>한다.
+  그래야 대립이 살아남는다.</p>
+
+  <h3>세 가지 기본 모양</h3>
+  <div class="defs">
+    <div>
+      <div class="k">Fan-out / Fan-in — 팬아웃·팬인</div>
+      <div class="v">하나를 N갈래로 뿌리고 다시 하나로 모은다. <strong>투자 아이디어 검증의 기본형.</strong>
+      갈래는 서로 독립이어야 의미가 있다.</div>
+    </div>
+    <div>
+      <div class="k">Pipeline — 파이프라인</div>
+      <div class="v">앞 노드의 출력이 뒤 노드의 입력. 순서가 의미를 가질 때.
+      예: 사실 수집 → 해석 → 내 상황에 대입 → 실행안.</div>
+    </div>
+    <div>
+      <div class="k">Map-reduce — 같은 처리를 N개 대상에</div>
+      <div class="v">보유 종목 12개 각각에 같은 질문을 던지고 표 하나로 모은다.
+      <strong>월간 포트폴리오 점검의 기본형.</strong></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <span class="tag">비개발자를 위한 번역</span>
+    <p>그래프를 쓴다고 해서 코드를 짜야 하는 건 아니다. 채팅 하나 안에서도 그래프를 흉내 낼 수 있다 —
+    <strong>대화를 3개 따로 열고</strong> 각각에 강세 / 약세 / 무효화조건을 맡긴 다음,
+    네 번째 대화에 세 결과를 붙여넣어 대조시키는 것. 느리지만 구조는 똑같고, 효과의 대부분이 여기서 나온다.
+    자동화는 그 다음 문제다.</p>
+  </div>
+</section>
+
+<!-- ============ 03 ============ -->
+<section id="choose">
+  <h2>언제 무엇을 쓰나</h2>
+
+  <p>판단 기준은 하나다. <strong>반복해야 하는 축이 시간인가, 관점인가.</strong></p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>상황</th><th>구조</th><th>이유</th></tr></thead>
+      <tbody>
+        <tr><td>월간 자산 점검</td><td>루프</td><td>같은 질문을 시간축으로 반복. 지난달 대비가 핵심</td></tr>
+        <tr><td>종목 하나 검증</td><td>그래프</td><td>한 시점에 상반된 관점이 동시에 필요</td></tr>
+        <tr><td>보유 12종목 일괄 점검</td><td>그래프(map)</td><td>대상이 N개, 처리는 동일</td></tr>
+        <tr><td>아파트 매수 검토</td><td>그래프 → 루프</td><td>한 번 분기 검토 후, 분기마다 전제 재확인</td></tr>
+        <tr><td>가치관 정립</td><td>느린 루프</td><td>한 번에 정해지지 않음. 6개월 단위 누적이 본질</td></tr>
+        <tr><td>지출 카테고리 정리</td><td>루프도 그래프도 아님</td><td>그냥 스프레드시트로 해라. 과잉설계다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>둘을 합치는 경우가 실제로는 제일 많다. <strong>그래프를 루프 안에 넣는 것</strong> —
+  매월 1일에 트리거되어, 보유 종목마다 3갈래 검토를 돌리고, 결과를 저널에 append하고,
+  다음 달에 그 저널을 읽고 시작한다. 이게 목표 형태다.</p>
+</section>
+
+<!-- ============ 04 ============ -->
+<section id="finance">
+  <h2>적용 ① 개인 재무 관리</h2>
+
+  <p class="lead">구조: <strong>월간 루프 1개.</strong> 이미 있는 크론 루프 위에 판단 층을 얹는다.</p>
+
+  <h3>무엇을 자동화하고 무엇을 안 하나</h3>
+  <p>시세 갱신·월 마감·차트는 이미 코드가 한다. 판단 루프가 할 일은 딱 하나,
+  <strong>"이번 달 숫자 중 설명이 필요한 것"을 찾아내는 것</strong>이다. 요약이 아니라 이상치 탐지다.
+  "순자산이 늘었습니다" 같은 문장은 대시보드가 이미 보여준다. 루프가 그걸 반복하면 가치가 0이다.</p>
+
+  <h3>루프 프롬프트</h3>
+  <p>매월 1일에 이 프롬프트가 돌게 한다. 핵심은 <strong>마지막 줄의 출력 제한</strong>이다.</p>
+
+  <pre><code>docs/journal/ 에서 최근 3개 회차 메모를 먼저 읽어라.
+그 다음 대시보드의 이번 달 데이터를 읽어라.
+
+다음 세 가지만 찾아라:
+1. 지난달 대비 설명이 안 되는 변화 (내가 입금/출금한 게 아닌데 움직인 것)
+2. SAA 목표 배분에서 ±5%p 이상 벗어난 카테고리
+3. 지난 회차 메모에서 "다음 달에 확인"이라고 적어둔 항목의 현재 상태
+
+찾은 게 없으면 "특이사항 없음"이라고만 답하라.
+최대 3개 항목, 항목당 3줄 이내. 조언은 하지 마라. 관측만 해라.
+결과를 docs/journal/YYYY-MM.md 로 저장하라.</code></pre>
+
+  <div class="note">
+    <span class="tag">왜 "조언은 하지 마라"인가</span>
+    <p>관측과 조언을 한 노드에 섞으면, 조언을 정당화하려고 관측이 왜곡된다.
+    "리밸런싱이 필요합니다"를 말하고 싶어서 편차를 크게 읽는 식이다.
+    관측 루프와 결정 노드는 반드시 분리해라. 조언은 <em>당신이</em> 메모를 읽고 판단하는 단계에서 나온다.</p>
+  </div>
+
+  <h3>상태를 어디에 두나</h3>
+  <p>이게 제일 중요하고 제일 많이 빠뜨리는 부분이다. LLM은 대화가 끝나면 전부 잊는다.
+  상태를 <strong>파일로</strong> 남겨야 다음 회차가 읽는다.</p>
+
+  <pre><code>docs/journal/
+  2026-07.md
+  2026-08.md
+  2026-09.md   ← 이번 회차가 쓴다. 다음 회차가 읽는다.</code></pre>
+
+  <p>DB에 넣지 마라. 마크다운 파일이면 충분하고, 당신이 직접 열어서 고칠 수 있어야 한다.
+  <strong>당신이 읽지 않는 상태는 상태가 아니라 쓰레기다.</strong></p>
+</section>
+
+<!-- ============ 05 ============ -->
+<section id="invest">
+  <h2>적용 ② 부동산 · 주식 · 가상자산 아이디어</h2>
+
+  <p class="lead">구조: <strong>그래프로 한 번 검증하고, 루프로 계속 추적한다.</strong>
+  둘 중 하나만 하면 의미가 없다.</p>
+
+  <h3>1단계 — 검증 그래프 (아이디어가 떠올랐을 때 1회)</h3>
+  <p>대화 3개를 따로 열고, 각각에 하나씩 맡긴다. 서로의 답을 보여주지 않는 게 핵심이다.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>노드</th><th>지시</th><th>출력</th></tr></thead>
+      <tbody>
+        <tr><td>강세</td><td>이 자산을 사야 하는 이유만 찾아라. 반론은 쓰지 마라.</td><td>근거 3개 + 각 근거의 출처</td></tr>
+        <tr><td>약세</td><td>이 자산을 사면 안 되는 이유만 찾아라. 반론은 쓰지 마라.</td><td>근거 3개 + 각 근거의 출처</td></tr>
+        <tr><td>무효화</td><td>내 논리가 틀렸다고 판정할 <strong>관측 가능한</strong> 사건을 찾아라.</td><td>조건 3개 + 각각 확인 방법</td></tr>
+        <tr><td>대조</td><td>위 셋을 붙여넣고: 강세·약세가 <strong>같은 사실을 다르게 해석</strong>한 지점을 찾아라.</td><td>쟁점 목록</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>네 번째 노드가 진짜다. 강세와 약세가 <strong>서로 다른 사실</strong>을 말하면 그냥 정보 부족이다.
+  <strong>같은 사실을 반대로 해석</strong>하는 지점이 나오면, 거기가 당신이 실제로 베팅하는 지점이다.
+  그 지점을 못 찾으면 아직 그 아이디어를 이해 못 한 거다.</p>
+
+  <h3>2단계 — 결정 저널 (사든 안 사든 무조건 쓴다)</h3>
+  <span class="filename">docs/decisions/2026-09-14-강남-재건축.md</span>
+  <pre><code># 결정: 검토만 / 매수 / 보류
+날짜: 2026-09-14
+자산: (종목·단지·코인)
+포지션 크기: 순자산의 __%
+
+## 내가 믿는 것 (3개, 각각 검증 가능한 형태로)
+1.
+2.
+3.
+
+## 틀렸다고 인정할 조건 (3개, 관측 가능한 사건으로)
+1.
+2.
+3.
+
+## 재검토일: 2026-12-14
+## 이 판단을 할 때 내 기분: (과열/평온/불안)</code></pre>
+
+  <div class="note caution">
+    <span class="tag">이 두 칸이 전부다</span>
+    <p>"틀렸다고 인정할 조건"과 "재검토일". 나머지는 장식이다.
+    무효화 조건 없는 투자 논거는 논거가 아니라 소망이다.
+    그리고 <strong>"기분" 칸을 진지하게 써라</strong> — 6개월 뒤 이 칸이 당신에 대해
+    가장 많은 걸 알려준다. 과열 상태에서 내린 결정의 승률을 세어보면 안다.</p>
+  </div>
+
+  <h3>3단계 — 추적 루프 (분기 1회)</h3>
+  <pre><code>docs/decisions/ 에서 재검토일이 지났거나 30일 이내인 파일을 전부 찾아라.
+각 파일에 대해:
+- "틀렸다고 인정할 조건" 3개가 현재 발생했는지 확인하라
+- 발생했다면 발생했다고만 말하라. 어떻게 하라고 하지 마라
+- 발생 안 했으면 "유효"라고만 써라
+
+발생한 것만 표로 출력하라. 없으면 "전부 유효".</code></pre>
+
+  <p>이 루프의 유일한 목적은 <strong>당신이 과거의 자신과 약속한 걸 잊지 못하게 하는 것</strong>이다.
+  수익률 추적이 아니다. 수익률은 대시보드가 보여준다.</p>
+
+  <div class="note caution">
+    <span class="tag">냉정하게</span>
+    <p>LLM은 시세를 예측하지 못한다. 이 루프가 생산하는 건 <strong>정확성이 아니라 일관성</strong>이다.
+    9월의 당신과 12월의 당신이 같은 기준으로 판단하게 만드는 것 —
+    그게 전부이고, 그것만으로도 대부분의 개인 투자자보다 낫다.
+    "AI한테 물어봤더니 좋다더라"로 쓰기 시작하면 이 구조는 비싼 확증편향 기계가 된다.</p>
+  </div>
+</section>
+
+<!-- ============ 06 ============ -->
+<section id="values">
+  <h2>적용 ③ 개인 가치관 정립</h2>
+
+  <p class="lead">구조: <strong>아주 느린 루프.</strong> 분기 또는 반기. 월간으로 돌리면 반드시 망한다.</p>
+
+  <p>가치관은 6주 만에 바뀌지 않는다. 월간으로 물으면 매번 비슷한 답을 쓰게 되고,
+  그러면 그 답을 진지하게 안 쓰게 되고, 그러면 루프 전체가 형식이 된다.
+  <strong>주기를 길게 잡는 게 설계의 핵심이다.</strong></p>
+
+  <h3>루프 프롬프트 (분기 1회)</h3>
+  <pre><code>docs/values/ 의 지난 회차들을 전부 읽어라.
+그 다음 docs/decisions/ 의 이번 분기 결정들을 읽어라.
+
+물어라:
+1. 내가 "중요하다"고 적어둔 것과, 실제로 시간·돈을 쓴 곳이 어긋난 지점은?
+2. 지난 회차에 쓴 문장 중 지금은 더 이상 안 믿는 게 있나?
+3. 같은 고민이 3회차 이상 반복되고 있나? 그렇다면 그건 고민이 아니라
+   내가 결정을 미루고 있는 것이다. 지적해라.
+
+위로하지 마라. 요약하지 마라. 어긋난 지점만 지적하라.</code></pre>
+
+  <h3>그래프를 쓰는 지점 — 가치관 충돌 테스트</h3>
+  <p>가치관 자체는 루프지만, <strong>가치관이 서로 충돌할 때</strong>는 그래프가 맞다.
+  "안정적인 현금흐름"과 "높은 성장"을 둘 다 원한다고 쓰여 있는데
+  실제 포트폴리오는 하나만 반영하고 있을 때 — 이건 한 문맥에서 물으면 얼버무린다.</p>
+
+  <ul>
+    <li><strong>노드 A:</strong> "안정성"을 최우선으로 놓고 내 포트폴리오를 비판해라</li>
+    <li><strong>노드 B:</strong> "성장"을 최우선으로 놓고 내 포트폴리오를 비판해라</li>
+    <li><strong>노드 C:</strong> A와 B를 붙여놓고 — 둘 다 만족시키는 건 불가능하다고 전제하고,
+    <strong>어느 쪽을 얼마나 포기할지</strong>의 선택지만 제시하라</li>
+  </ul>
+
+  <p>C 노드에 "둘 다 만족은 불가능하다"를 명시적으로 넣는 게 중요하다.
+  안 넣으면 "균형 잡힌 포트폴리오를 구성하세요"라는 무의미한 답이 나온다.</p>
+
+  <div class="note">
+    <span class="tag">현실적 기대치</span>
+    <p>가치관 루프의 산출물은 결론이 아니다. <strong>기록</strong>이다.
+    2년 뒤에 4~8개의 회차가 쌓였을 때, 그걸 연속으로 읽는 것 자체가 결과물이다.
+    한 회차 한 회차는 대부분 시시할 것이고, 그게 정상이다.</p>
+  </div>
+</section>
+
+<!-- ============ 07 ============ -->
+<section id="fail">
+  <h2>망하는 방식 6가지</h2>
+
+  <p>설계보다 이쪽이 더 쓸모 있다. 아래는 전부 실제로 흔한 실패다.</p>
+
+  <ul class="fails">
+    <li>
+      <span class="name">확증 루프</span>
+      <p>회차 1에서 낙관적으로 쓴 메모를, 회차 2의 모델이 읽고 더 낙관해진다.
+      3회차쯤 되면 근거가 강화된 것처럼 보이지만 실제로는 자기 말을 되풀이한 것뿐이다.</p>
+      <span class="fix">해결: 매 회차에 반대 노드를 <strong>강제</strong>로 넣어라. "지난 회차의 판단이 틀렸다면 그 이유는?"을 고정 질문으로.</span>
+    </li>
+    <li>
+      <span class="name">데이터 없는 루프</span>
+      <p>모델 단독으로는 오늘 시세도, 이번 주 뉴스도 모른다. 지식 컷오프 이후는 전부 모른다.
+      데이터 없이 "분석"을 시키면 그럴듯한 문장이 나오는데, 근거가 없다.</p>
+      <span class="fix">해결: 루프의 첫 노드는 항상 <strong>데이터 가져오기</strong>여야 한다. 이 앱의 <code>/api/price</code>처럼 실제 소스가 물려 있어야 한다.</span>
+    </li>
+    <li>
+      <span class="name">빈도 오류</span>
+      <p>자산배분은 월·분기 단위 문제인데 일간 루프를 돌린다. 매일 뭔가를 보고받으면
+      매일 뭔가를 하고 싶어진다. 루프가 과잉매매를 유도하는 구조가 된다.</p>
+      <span class="fix">해결: <strong>의사결정 주기에 루프 주기를 맞춰라.</strong> 더 자주 도는 건 이득이 아니라 비용이다.</span>
+    </li>
+    <li>
+      <span class="name">종료조건 없음</span>
+      <p>돌긴 도는데 아무도 안 읽는다. 3개월 뒤 저널 폴더에 파일 12개, 열어본 건 2개.</p>
+      <span class="fix">해결: "특이사항 없음"을 <strong>정상 출력으로 허용</strong>하라. 매번 뭔가를 말하게 하면 노이즈만 쌓인다.</span>
+    </li>
+    <li>
+      <span class="name">상태 비대</span>
+      <p>저널이 20회차쯤 쌓이면 전부 읽히지 않는다. 문맥 한도에 걸려 앞쪽이 잘리고,
+      어느 부분이 잘렸는지는 아무도 모른다.</p>
+      <span class="fix">해결: 6개월마다 <strong>압축 회차</strong>를 넣어라 — 지난 6회차를 1장으로 요약하고, 이후 루프는 요약본 + 최근 3회차만 읽는다.</span>
+    </li>
+    <li>
+      <span class="name">그래프를 쓸 필요 없는 데 쓰기</span>
+      <p>"이번 달 카드값 정리"에 5노드 그래프를 짠다. 구조를 만드는 재미가
+      실제 문제 해결보다 커지는 순간이다.</p>
+      <span class="fix">해결: <strong>대화 한 번으로 끝나면 그냥 한 번으로 끝내라.</strong> 그래프는 관점이 실제로 충돌할 때만 값을 한다.</span>
+    </li>
+  </ul>
+</section>
+
+<!-- ============ 08 ============ -->
+<section id="start">
+  <h2>첫 주에 할 것</h2>
+
+  <p class="lead">전부 만들려고 하면 아무것도 안 만들어진다. 순서대로 하나씩.</p>
+
+  <ol class="check">
+    <li><strong>폴더 3개를 만든다.</strong>
+      <code>docs/journal/</code>, <code>docs/decisions/</code>, <code>docs/values/</code>.
+      비어 있어도 만든다. 상태를 둘 자리가 먼저다.</li>
+
+    <li><strong>결정 저널 1장을 손으로 쓴다.</strong>
+      지금 보유 중인 것 중 가장 비중 큰 자산 하나에 대해, 위 템플릿을 채운다.
+      자동화 전에 <strong>형식이 쓸모 있는지부터 확인</strong>해야 한다. 30분.</li>
+
+    <li><strong>검증 그래프를 수동으로 한 번 돌린다.</strong>
+      대화 3개 + 대조 1개. 자동화 없이. 결과가 쓸모 있으면 계속하고, 아니면 여기서 멈춰라.
+      쓸모없는 구조를 자동화하는 게 최악이다.</li>
+
+    <li><strong>월간 루프를 붙인다.</strong>
+      위의 재무 루프 프롬프트를 <code>docs/journal/</code>에 저장해두고, 매월 1일에 실행한다.
+      스케줄 기능(Routine)이 있으면 걸고, 없으면 캘린더 알림으로 시작해도 된다.
+      <strong>수동 루프도 루프다.</strong></li>
+
+    <li><strong>분기 루프는 3개월 뒤에.</strong>
+      추적 루프와 가치관 루프는 저널이 쌓여야 의미가 있다.
+      지금 만들면 읽을 상태가 없어서 빈 출력이 나온다.</li>
+  </ol>
+
+  <div class="note">
+    <span class="tag">자동화 도구에 대해</span>
+    <p>반복 실행은 세 가지 방법이 있고, 위로 갈수록 손이 덜 간다:
+    <strong>(1)</strong> Vercel cron — 이미 쓰고 있는 방식. 코드가 도는 결정론적 작업에 적합.
+    <strong>(2)</strong> Claude Code의 Routine(스케줄 트리거) — 프롬프트를 주기적으로 실행. 최소 간격은 보통 1시간.
+    <strong>(3)</strong> <code>/loop</code> 슬래시 명령 — 한 세션 안에서 반복. 간격을 생략하면 모델이 스스로 간격을 정한다.
+    월간 루프에는 (2)가 맞다. <code>/loop</code>는 세션이 살아있는 동안만 돌기 때문에 월 단위에는 안 맞는다.</p>
+  </div>
+</section>
+
+<footer>
+  <p>이 문서에서 확실한 것과 불확실한 것을 구분하면:
+  <strong>확실한 것</strong> — 상태를 파일로 남기지 않으면 루프가 성립하지 않는다는 것,
+  관점을 분리하지 않으면 답변이 타협한다는 것, 무효화 조건 없는 논거는 검증 불가능하다는 것.
+  <strong>불확실한 것</strong> — "루프 엔지니어링 / 그래프 엔지니어링"이라는 명칭의 표준적 정의,
+  그리고 이 구조가 당신의 수익률을 개선할지 여부. 후자는 아무도 모른다.
+  이 구조가 보장하는 건 <em>판단의 일관성</em>이지 판단의 정확성이 아니다.</p>
+</footer>
+
+</div>
